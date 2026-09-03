@@ -36,7 +36,7 @@ export function ShellFrame({
   children,
 }: {
   sections: NavSection[]
-  brand: { name: string; initial: string }
+  brand: { name: string }
   initialCollapsed: boolean
   /** Rendered on the server so the sign-out form action stays server-owned. */
   userMenu: ReactNode

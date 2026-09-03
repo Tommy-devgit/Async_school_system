@@ -34,7 +34,7 @@ export interface SidebarProps {
   onCollapsedChange: (collapsed: boolean) => void
   mobileOpen: boolean
   onMobileOpenChange: (open: boolean) => void
-  brand: { name: string; initial: string }
+  brand: { name: string }
   /** Who is signed in, for the footer. */
   account: { name: string; role: string; initials: string }
   /** The sign-out server action, passed down so the form stays server-owned. */
@@ -120,10 +120,17 @@ function SidebarBody({
           className="flex min-w-0 items-center gap-2.5"
           aria-label={`${brand.name} — dashboard`}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-ink">
-            <span className="font-display text-[14px] leading-none text-white">
-              {brand.initial}
-            </span>
+          {/*
+            The mark, not a monogram in a black box. A filled square holding a
+            single letter reads as a placeholder somebody meant to replace, and
+            it was the heaviest thing on the page. A stroked school building
+            belongs to the same drawn set as every other icon here, carries the
+            same weight as the navigation beside it, and still says what the
+            product is when the rail is collapsed to 64px and this is the only
+            thing left of the header.
+          */}
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center text-graphite">
+            <Icon name="campus" size={22} />
           </span>
           {collapsed ? null : (
             <span className="min-w-0">
