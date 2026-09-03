@@ -7,9 +7,7 @@ import { formatPercent, formatText } from '@/lib/format'
  *
  * Presentational: the inputs belong to the single form in `MarkList`, and are
  * named by mark id so one submit carries the whole roster. Percentage and
- * grade are Odoo's computed values, shown read-only — the grading scheme is
- * never reimplemented here. Entry is disabled unless the assessment is open,
- * mirroring the guard in `school.mark.write`; Odoo enforces it regardless.
+ * grade are Odoo's computed values, shown read-only.
  */
 export function MarkRow({
   markId,
@@ -40,6 +38,34 @@ export function MarkRow({
   const control =
     'rounded-[8px] border border-silver px-2 py-1 text-[13px] focus:border-action-blue ' +
     'focus:outline-none disabled:bg-paper disabled:text-stone'
+
+  /**
+   * Spreadsheet-style keyboard navigation.
+   * Allows teachers to use Enter, ArrowDown, or ArrowUp to quickly jump between
+   * students without reaching for the mouse.
+   */
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault() // Prevent form submission or standard scrolling
+
+      // Query all score inputs currently rendered on the page
+      const inputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>('input[id^="score-"]')
+      )
+      const currentIndex = inputs.indexOf(e.currentTarget)
+
+      if (e.key === 'ArrowUp' && currentIndex > 0) {
+        inputs[currentIndex - 1].focus()
+        inputs[currentIndex - 1].select() // Auto-highlight existing score
+      } else if (
+        (e.key === 'Enter' || e.key === 'ArrowDown') &&
+        currentIndex < inputs.length - 1
+      ) {
+        inputs[currentIndex + 1].focus()
+        inputs[currentIndex + 1].select()
+      }
+    }
+  }
 
   return (
     <tr className="border-b border-silver/70 last:border-0">
@@ -74,6 +100,7 @@ export function MarkRow({
             defaultValue={score ?? ''}
             disabled={!editable}
             aria-invalid={error ? true : undefined}
+            onKeyDown={handleKeyDown}
             className={`${control} tabular w-20`}
           />
           <span className="text-[12px] whitespace-nowrap text-stone">/ {maxScore}</span>
