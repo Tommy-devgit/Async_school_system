@@ -51,9 +51,26 @@ try {
   check('signed in', true)
 
   /* =================================================== student edit === */
+  /*
+    The student has to be approved *and* missing a FAN, because the whole
+    narrative below is that `_check_required_fields_for_submission` re-fires on
+    any write touching `name` and refuses until the FAN is supplied.
+
+    Picking merely "the first approved student" used to work when no student
+    had a FAN. Students carry them now, so that selection quietly chose one
+    whose edit succeeds, and the test failed asserting a refusal that Odoo had
+    no reason to raise. The precondition belongs in the query, not in a
+    comment.
+  */
   const [STUDENT] = await call('school.student', 'search',
-    [[['registration_status', '=', 'approved']]], { limit: 1 })
-  if (!STUDENT) throw new Error('no approved student to edit')
+    [[['registration_status', '=', 'approved'], ['fan_number', '=', false]]], { limit: 1 })
+  if (!STUDENT) {
+    console.log(String.fromCharCode(10) +
+      '  SKIP  every approved student already has a FAN, so the refusal path')
+    console.log('        cannot be exercised against this database.')
+    await browser.close()
+    process.exit(0)
+  }
   const before = (await call('school.student', 'read',
     [[STUDENT], ['name', 'first_name', 'middle_name', 'last_name']]))[0]
   console.log(`\n  student ${STUDENT} before: name=${JSON.stringify(before.name)} parts=${JSON.stringify([before.first_name, before.middle_name, before.last_name])}`)
