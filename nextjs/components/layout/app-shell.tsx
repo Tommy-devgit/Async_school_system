@@ -31,7 +31,7 @@ export async function AppShell({ user, children }: { user: CurrentUser; children
   return (
     <ShellFrame
       sections={sections}
-      brand={{ name: 'Async School', initial: 'A' }}
+      brand={{ name: 'Async School' }}
       initialCollapsed={collapsed}
       account={{ name: user.name, role, initials }}
       signOutAction={logoutAction}
