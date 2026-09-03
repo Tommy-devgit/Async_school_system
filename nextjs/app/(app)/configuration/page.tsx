@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Card, CardHeader, Cell, DataTable, DateText, EmptyState, ErrorState, PageHeader, Row } from '@/components/ui'
+import { RowLink } from '@/components/ui/table'
 import { formatSelection } from '@/lib/format'
 import { toOdooError } from '@/lib/odoo/errors'
 import { hasAccess } from '@/lib/odoo/client'
@@ -31,17 +32,38 @@ function VocabularyCard({
   head,
   rows,
   render,
+  manageHref,
 }: {
   title: string
   hint?: string
   head: string[]
   rows: Page<SimpleRow> | null
   render: (row: SimpleRow) => React.ReactNode
+  /*
+    Where this vocabulary can actually be changed. Only the ones with a
+    management screen carry it — the rest are still read-only here, and
+    offering a link to a page that does not exist would be worse than the
+    honest absence of one.
+  */
+  manageHref?: string
 }) {
   return (
     <Card padded={false}>
       <div className="p-6 pb-0">
-        <CardHeader title={title} hint={hint} />
+        <CardHeader
+          title={title}
+          hint={hint}
+          action={
+            manageHref && rows !== null ? (
+              <Link
+                href={manageHref}
+                className="shrink-0 text-[12px] text-action-blue hover:underline"
+              >
+                Manage
+              </Link>
+            ) : undefined
+          }
+        />
       </div>
       {rows === null ? (
         <EmptyState title="Not available to your role" />
@@ -258,6 +280,7 @@ export default async function ConfigurationPage() {
           />
           <VocabularyCard
             title="Campuses"
+            manageHref="/branches"
             head={['Campus', 'Code', 'Active']}
             rows={campuses}
             render={(row) => (
@@ -270,6 +293,7 @@ export default async function ConfigurationPage() {
           />
           <VocabularyCard
             title="Rooms"
+            manageHref="/rooms"
             head={['Room', 'Code', 'Type', 'Capacity']}
             rows={rooms}
             render={(row) => (
@@ -296,7 +320,17 @@ export default async function ConfigurationPage() {
             <DataTable columns={['Class', 'Subject', 'Type', 'Maximum', 'Pass mark', 'Active']}>
               {curriculum.rows.map((row) => (
                 <Row key={row.id}>
-                  <Cell strong>{m2oLabel(row.class_id as Many2one)}</Cell>
+                  <Cell strong>
+                    {/*
+                      The row links to the one thing about a curriculum line
+                      that is worth changing: what the subject is marked out of
+                      and what passes it. Both are what every mark list and
+                      report card is generated against.
+                    */}
+                    <RowLink href={`/curriculum/${row.id}/edit`}>
+                      {m2oLabel(row.class_id as Many2one)}
+                    </RowLink>
+                  </Cell>
                   <Cell>{m2oLabel(row.subject_id as Many2one)}</Cell>
                   <Cell>{formatSelection(row.subject_type)}</Cell>
                   <Cell numeric>{row.maximum_mark}</Cell>
