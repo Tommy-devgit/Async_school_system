@@ -546,6 +546,48 @@ export interface GradeSubjectRow {
   active: boolean
 }
 
+/**
+ * One curriculum line, with the fields the list does not carry.
+ *
+ * `optional_selection_limit` only means anything on an optional or elective
+ * subject — it is how many of them a student must choose — so the form asks
+ * for it conditionally rather than always.
+ */
+export interface CurriculumLine extends GradeSubjectRow {
+  optional_selection_limit: number
+}
+
+export function getCurriculumLine(id: number): Promise<CurriculumLine | null> {
+  return readOne<CurriculumLine>('school.grade.subject', id, [
+    'class_id',
+    'subject_id',
+    'subject_type',
+    'maximum_mark',
+    'pass_mark',
+    'optional_selection_limit',
+    'active',
+  ])
+}
+
+/**
+ * Change how a subject is graded for one class.
+ *
+ * `class_id` and `subject_id` are deliberately not writable here. The pair is
+ * unique and everything already recorded — marks, report-card snapshots —
+ * hangs off it, so re-pointing a line would rewrite history rather than
+ * correct it. Removing the subject and adding the right one is the honest
+ * operation, and the class-subjects wizard already does that.
+ *
+ * Odoo owns the arithmetic: a CHECK constraint keeps the pass mark between
+ * zero and the maximum, and answers in its own words when it does not.
+ */
+export function updateCurriculumLine(
+  id: number,
+  values: Record<string, unknown>,
+): Promise<boolean> {
+  return write('school.grade.subject', [id], values)
+}
+
 export function listCurriculum(options: { classId?: number } = {}): Promise<
   Page<GradeSubjectRow>
 > {
