@@ -6,6 +6,10 @@
  *
  * Env: E2E_LOGIN, E2E_PASSWORD, plus the ODOO_* pair that scripts/rpc.mjs reads.
  *
+ * E2E_LOGIN must hold Administrator or Exam Officer. The second half
+ * configures grading schemes, and `school.grading.scheme` carries ACL rows
+ * for those two groups only — a registrar gets a refusal, not a failure.
+ *
  * MUTATES SHARED STATE and restores it: writes a FAN and a middle name to one
  * approved student, and briefly makes a probe scheme the company's active one.
  * Both are put back before the script exits, and the probe scheme is deleted.
