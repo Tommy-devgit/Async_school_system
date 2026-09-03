@@ -112,6 +112,16 @@ function SidebarBody({
   pathname,
   showClose,
 }: SidebarProps & { pathname: string; showClose: boolean }) {
+  /*
+    Resolved once over every section rather than per group: the entry that owns
+    the current page may live in a different group from the one being drawn, and
+    only the single longest match anywhere may be marked.
+  */
+  const current = activeHref(
+    pathname,
+    sections.flatMap((section) => section.items.map((item) => item.href)),
+  )
+
   return (
     <>
       <div className="flex h-14 shrink-0 items-center gap-2.5 px-4">
@@ -150,7 +160,7 @@ function SidebarBody({
 
       <nav className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-1 pb-3">
         {sections.map((section) => (
-          <NavGroup key={section.id} section={section} collapsed={collapsed} pathname={pathname} />
+          <NavGroup key={section.id} section={section} collapsed={collapsed} current={current} />
         ))}
       </nav>
 
@@ -238,15 +248,16 @@ function SidebarBody({
 function NavGroup({
   section,
   collapsed,
-  pathname,
+  current,
 }: {
   section: NavSection
   collapsed: boolean
-  pathname: string
+  /** The one href the current page belongs to, resolved across every section. */
+  current: string | null
 }) {
   const listId = useId()
   const [folded, setFolded] = useState(false)
-  const containsActive = section.items.some((item) => isActive(pathname, item.href))
+  const containsActive = section.items.some((item) => item.href === current)
 
   // A folded group holding the current page would hide where the user is.
   const expanded = !folded || containsActive
@@ -276,7 +287,7 @@ function NavGroup({
       <ul id={listId} className={cx('space-y-0.5', !collapsed && !expanded && 'hidden')}>
         {section.items.map((item) => (
           <li key={item.href}>
-            <NavLink item={item} collapsed={collapsed} active={isActive(pathname, item.href)} />
+            <NavLink item={item} collapsed={collapsed} active={item.href === current} />
           </li>
         ))}
       </ul>
@@ -317,6 +328,24 @@ function NavLink({
 }
 
 /** `/students` is active on `/students/12` but not on `/students-archive`. */
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`)
+/**
+ * Which single nav entry the current page belongs to.
+ *
+ * A plain prefix test lit up two entries at once wherever one nav href nested
+ * under another: on /configuration/grading both "Configuration" and "Grading
+ * schemes" were drawn as the current page, so the sidebar claimed the user was
+ * in two places.
+ *
+ * The longest matching href wins, which is the only entry that can be right —
+ * the most specific one that still contains the page. Comparing lengths is
+ * enough because every candidate here is already a prefix of the same path, so
+ * they differ only in how far down they reach.
+ */
+function activeHref(pathname: string, hrefs: readonly string[]): string | null {
+  let best: string | null = null
+  for (const href of hrefs) {
+    if (pathname !== href && !pathname.startsWith(`${href}/`)) continue
+    if (best === null || href.length > best.length) best = href
+  }
+  return best
 }
