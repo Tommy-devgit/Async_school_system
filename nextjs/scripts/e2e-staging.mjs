@@ -42,7 +42,9 @@ async function signIn(context, login) {
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await Promise.all([
-    page.waitForURL('**/dashboard', { timeout: 90_000 }).catch(() => {}),
+    // `landingPath` routes each role somewhere different; leaving /login is
+    // what "signed in" means here.
+    page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 }).catch(() => {}),
     page.click('#submit-login'),
   ])
   return page

@@ -33,7 +33,14 @@ await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
-await page.waitForURL('**/dashboard', { timeout: 90_000 })
+/*
+  Sign-in no longer lands everyone on the dashboard — `landingPath` routes by
+  role — so wait to leave /login and then reach the dashboard on purpose. This
+  suite is about the shell that wraps every page, not about where the bounce
+  points.
+*/
+await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
+await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
 
 console.log('\ndesktop — expanded')
 const rail = page.locator('#primary-navigation')
@@ -129,7 +136,8 @@ await mp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
 await mp.fill('#login', LOGIN)
 await mp.fill('#password', PASSWORD)
 await mp.click('#submit-login')
-await mp.waitForURL('**/dashboard', { timeout: 90_000 })
+await mp.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
+await mp.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
 
 check('rail hidden', !(await mp.locator('#primary-navigation').isVisible()))
 check('drawer closed is inert', await mp.locator('#mobile-navigation').evaluate((el) => el.hasAttribute('inert')))

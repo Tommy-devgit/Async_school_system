@@ -6,6 +6,11 @@
  *
  * Env: E2E_LOGIN, E2E_PASSWORD, plus the ODOO_* pair scripts/rpc.mjs reads.
  *
+ * E2E_LOGIN must hold Administrator. A registrar may read the questionnaire
+ * but not create one — `school.registration.question` grants it read only —
+ * so the create form never renders and the suite stalls filling a field that
+ * was correctly withheld.
+ *
  * MUTATES SHARED STATE and restores it: creates a question with a choice, a
  * document rule, and answers on one student; deletes all of them afterwards.
  * An authorized override cannot be deleted by design, so this only exercises

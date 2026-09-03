@@ -81,8 +81,14 @@ try {
   await page.fill('#login', process.env.E2E_REGISTRAR_LOGIN ?? '')
   await page.fill('#password', process.env.E2E_PASSWORD ?? '')
   await page.click('#submit-login')
-  await page.waitForURL('**/dashboard', { timeout: 90_000 }).catch(() => {})
-  check('reaches the dashboard', page.url().includes('/dashboard'), page.url())
+  /*
+    What this suite is proving is that a fresh sign-in works after the session
+    was destroyed — not where the sign-in lands. `landingPath` sends each role
+    somewhere different, so asserting on /dashboard tested the wrong thing and
+    failed for every role except admin and director.
+  */
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
+  check('signs back in and leaves the login page', !page.url().includes('/login'), page.url())
 
   await context.close()
 } finally {

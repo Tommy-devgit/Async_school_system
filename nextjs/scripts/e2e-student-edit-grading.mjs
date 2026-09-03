@@ -6,6 +6,10 @@
  *
  * Env: E2E_LOGIN, E2E_PASSWORD, plus the ODOO_* pair that scripts/rpc.mjs reads.
  *
+ * E2E_LOGIN must hold Administrator or Exam Officer. The second half
+ * configures grading schemes, and `school.grading.scheme` carries ACL rows
+ * for those two groups only — a registrar gets a refusal, not a failure.
+ *
  * MUTATES SHARED STATE and restores it: writes a FAN and a middle name to one
  * approved student, and briefly makes a probe scheme the company's active one.
  * Both are put back before the script exits, and the probe scheme is deleted.
@@ -40,13 +44,37 @@ try {
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
-  await page.waitForURL('**/dashboard', { timeout: 60_000 })
+  /*
+    Signing in no longer lands everyone on the dashboard: `landingPath` sends a
+    registrar to their submitted registrations and a teacher to their open mark
+    lists. Waiting for a specific route therefore tests navigation policy rather
+    than sign-in, and times out for most roles. Waiting to leave /login is the
+    thing this actually needs.
+  */
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
   check('signed in', true)
 
   /* =================================================== student edit === */
+  /*
+    The student has to be approved *and* missing a FAN, because the whole
+    narrative below is that `_check_required_fields_for_submission` re-fires on
+    any write touching `name` and refuses until the FAN is supplied.
+
+    Picking merely "the first approved student" used to work when no student
+    had a FAN. Students carry them now, so that selection quietly chose one
+    whose edit succeeds, and the test failed asserting a refusal that Odoo had
+    no reason to raise. The precondition belongs in the query, not in a
+    comment.
+  */
   const [STUDENT] = await call('school.student', 'search',
-    [[['registration_status', '=', 'approved']]], { limit: 1 })
-  if (!STUDENT) throw new Error('no approved student to edit')
+    [[['registration_status', '=', 'approved'], ['fan_number', '=', false]]], { limit: 1 })
+  if (!STUDENT) {
+    console.log(String.fromCharCode(10) +
+      '  SKIP  every approved student already has a FAN, so the refusal path')
+    console.log('        cannot be exercised against this database.')
+    await browser.close()
+    process.exit(0)
+  }
   const before = (await call('school.student', 'read',
     [[STUDENT], ['name', 'first_name', 'middle_name', 'last_name']]))[0]
   console.log(`\n  student ${STUDENT} before: name=${JSON.stringify(before.name)} parts=${JSON.stringify([before.first_name, before.middle_name, before.last_name])}`)

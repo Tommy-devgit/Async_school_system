@@ -6,6 +6,11 @@
  *
  * Env: E2E_LOGIN, E2E_PASSWORD, plus the ODOO_* pair scripts/rpc.mjs reads.
  *
+ * E2E_LOGIN must hold Administrator or Teacher. `school.class.schedule`
+ * carries ACL rows for those two groups only, so a registrar reaches the
+ * timetable section and is refused — which reads as a suite failure and is
+ * really the backend answering correctly.
+ *
  * MUTATES SHARED STATE and restores it: creates one class and one subject and
  * deletes them; renames one assessment and one announcement and puts both
  * back.
@@ -42,7 +47,14 @@ try {
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
-  await page.waitForURL('**/dashboard', { timeout: 60_000 })
+  /*
+    Signing in no longer lands everyone on the dashboard: `landingPath` sends a
+    registrar to their submitted registrations and a teacher to their open mark
+    lists. Waiting for a specific route therefore tests navigation policy rather
+    than sign-in, and times out for most roles. Waiting to leave /login is the
+    thing this actually needs.
+  */
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
   check('signed in', true)
 
   /* ========================================================= subjects === */
