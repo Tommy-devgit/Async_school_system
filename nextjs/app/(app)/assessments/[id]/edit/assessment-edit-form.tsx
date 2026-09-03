@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { Button } from '@/components/ui'
 import { EthiopianDateInput } from '@/components/ui/ethiopian-date-input'
 import {
@@ -29,17 +29,6 @@ export interface AssessmentEditValues {
   markCount: number
 }
 
-/**
- * Correcting an assessment.
- *
- * Once the mark list exists, Odoo freezes the setup — type, date, maximum and
- * weight — because every row was generated against it. Rather than render
- * inputs whose write would bounce, the form drops them and says why. The name
- * is never frozen, so a typo stays correctable at any point.
- *
- * Class, subject and term are not editable anywhere: they come from the
- * teacher assignment the assessment was created against.
- */
 export function AssessmentEditForm({
   assessment,
   types,
@@ -57,6 +46,31 @@ export function AssessmentEditForm({
   const value = (field: keyof AssessmentEditValues) =>
     prior[field] !== undefined ? prior[field] : String(assessment[field] ?? '')
   const errors = state.fieldErrors ?? {}
+
+  // React state for auto-fill logic (initialized with the existing database values)
+  const [maxMark, setMaxMark] = useState(value('max_mark'))
+  const [weight, setWeight] = useState(value('weight'))
+
+  const handleTypeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const type = event.target.value
+    
+    if (type === 'quiz') {
+      setMaxMark('5')
+      setWeight('1')
+    } else if (type === 'assignment') {
+      setMaxMark('15')
+      setWeight('2')
+    } else if (type === 'test') {
+      setMaxMark('10')
+      setWeight('3')
+    } else if (type === 'mid' || type === 'mid_term' || type === 'midterm') {
+      setMaxMark('20')
+      setWeight('4')
+    } else if (type === 'final' || type === 'exam' || type === 'final_exam') {
+      setMaxMark('50')
+      setWeight('5')
+    }
+  }
 
   return (
     <form action={formAction} className="space-y-6">
@@ -108,6 +122,7 @@ export function AssessmentEditForm({
             required
             options={types}
             defaultValue={value('assessment_type')}
+            onChange={handleTypeChange}
             error={errors.assessment_type}
           />
           <Field
@@ -126,7 +141,8 @@ export function AssessmentEditForm({
             min={1}
             step="0.5"
             required
-            defaultValue={value('max_mark')}
+            value={maxMark}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxMark(e.target.value)}
             error={errors.max_mark}
           />
           <TextField
@@ -136,7 +152,8 @@ export function AssessmentEditForm({
             min={0.1}
             step="0.1"
             required
-            defaultValue={value('weight')}
+            value={weight}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWeight(e.target.value)}
             error={errors.weight}
             hint="All assessments for this subject and term may not exceed 100 together."
           />

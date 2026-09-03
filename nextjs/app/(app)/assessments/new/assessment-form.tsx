@@ -43,11 +43,8 @@ function Field({
         {label}
         {required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
-
       {children}
-
       {hint ? <p className="mt-1 text-[11px] text-stone">{hint}</p> : null}
-
       {error ? (
         <p role="alert" className="mt-1 text-[11px] text-danger">
           {error}
@@ -72,7 +69,32 @@ export function AssessmentForm({
   const values = state.values ?? {}
   const errors = state.fieldErrors ?? {}
   const [assignmentId, setAssignmentId] = useState(values.assignmentId ?? '')
+  
+  // React state for both fields so they auto-fill but remain editable
+  const [maxMark, setMaxMark] = useState(values.max_mark ?? '')
+  const [weight, setWeight] = useState(values.weight ?? '')
 
+  const handleTypeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const type = event.target.value
+    
+    if (type === 'quiz') {
+      setMaxMark('5')
+      setWeight('1')
+    } else if (type === 'assignment') {
+      setMaxMark('15')
+      setWeight('2')
+    } else if (type === 'test') {
+      setMaxMark('10')
+      setWeight('3')
+    } else if (type === 'mid' || type === 'mid_term' || type === 'midterm') {
+      setMaxMark('20')
+      setWeight('4')
+    } else if (type === 'final' || type === 'exam' || type === 'final_exam') {
+      setMaxMark('50')
+      setWeight('5')
+    }
+  }
+  
   const chosen = assignments.find((item) => String(item.id) === assignmentId)
 
   return (
@@ -131,8 +153,10 @@ export function AssessmentForm({
               id="assessment_type"
               name="assessment_type"
               className={INPUT}
-              defaultValue={values.assessment_type ?? 'test'}
+              defaultValue={values.assessment_type ?? ''}
+              onChange={handleTypeChange}
             >
+              <option value="">Select type...</option>
               {types.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -165,7 +189,8 @@ export function AssessmentForm({
               step="0.01"
               min={0.01}
               className={INPUT}
-              defaultValue={values.max_mark ?? '100'}
+              value={maxMark}
+              onChange={(e) => setMaxMark(e.target.value)}
             />
           </Field>
 
@@ -182,7 +207,8 @@ export function AssessmentForm({
               step="0.01"
               min={0}
               className={INPUT}
-              defaultValue={values.weight ?? '1'}
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
             />
           </Field>
         </div>
