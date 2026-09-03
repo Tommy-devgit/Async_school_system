@@ -40,7 +40,14 @@ try {
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
-  await page.waitForURL('**/dashboard', { timeout: 60_000 })
+  /*
+    Signing in no longer lands everyone on the dashboard: `landingPath` sends a
+    registrar to their submitted registrations and a teacher to their open mark
+    lists. Waiting for a specific route therefore tests navigation policy rather
+    than sign-in, and times out for most roles. Waiting to leave /login is the
+    thing this actually needs.
+  */
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
   check('signed in', true)
 
   /* =================================================== student edit === */
