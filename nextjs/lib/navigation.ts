@@ -237,6 +237,24 @@ const NAV_RULES: NavRuleSection[] = [
         visible: (r) => any(r.isRegistrar, r.isAdmin),
       },
       {
+        href: '/rooms',
+        label: 'Rooms',
+        icon: 'rooms',
+        description: 'Where classes and timetable slots are placed',
+        // school.room carries ACL rows for the administrator and the teacher
+        // only; nobody else can read it, so nobody else is offered the screen.
+        visible: (r) => any(r.isAdmin, r.isTeacher),
+      },
+      {
+        href: '/branches',
+        label: 'Branches',
+        icon: 'campus',
+        description: 'Campuses that classes, staff and notices scope to',
+        // school.campus is readable by every school role except finance.
+        visible: (r) =>
+          any(r.isAdmin, r.isDirector, r.isRegistrar, r.isTeacher, r.isFrontOffice, r.isHr),
+      },
+      {
         href: '/configuration/grading',
         label: 'Grading schemes',
         icon: 'marks',
