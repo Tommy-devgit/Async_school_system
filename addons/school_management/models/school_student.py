@@ -180,12 +180,36 @@ class SchoolStudent(models.Model):
                 raise ValidationError('The student stream must match the selected class stream.')
 
     _FAN_RE = re.compile(r'^\d{16}$')
+    _EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+    _PHONE_CHARS_RE = re.compile(r'^\+?[\d\s\-]+$')
 
     @api.constrains('fan_number')
     def _check_fan_format(self):
         for rec in self.filtered('fan_number'):
             if not self._FAN_RE.match(rec.fan_number):
                 raise ValidationError("FAN (National ID) must be exactly 16 digits.")
+    @api.constrains('email')
+    def _check_email_format(self):
+        for rec in self.filtered('email'):
+            if not self._EMAIL_RE.match(rec.email.strip()):
+                raise ValidationError("Please enter a valid email address.")
+                
+
+    @api.constrains('emergency_contact_phone')
+    def _check_emergency_contact_phone(self):
+        for rec in self.filtered('emergency_contact_phone'):
+            raw = rec.emergency_contact_phone.strip()
+            if not self._PHONE_CHARS_RE.match(raw):
+                raise ValidationError(
+                    "Emergency Contact Phone must contain only numbers "
+                    "(optionally with +, spaces, or dashes) — no letters."
+                )
+            if not rec._is_valid_phone(raw):
+                raise ValidationError(
+                    "Emergency Contact Phone is invalid — set Nationality for automatic "
+                    "country code, or include + code manually."
+                )
+                        
     BASE_GRADE1_AGE = 6
     ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png']
 
@@ -227,6 +251,9 @@ class SchoolStudent(models.Model):
                             f"Invalid file type for {label}: '{ext}'. "
                             f"Allowed types: {', '.join(self.ALLOWED_EXTENSIONS)}"
                         )
+    
+
+   
 
     @api.depends('enrollment_ids')
     def _compute_enrollment_count(self):
@@ -284,8 +311,8 @@ class SchoolStudent(models.Model):
             missing.append('FAN (National ID)')
         if not self.emergency_contact_name:
             missing.append('Emergency Contact Name')
-        if not self.emergency_contact_phone:
-            missing.append('Emergency Contact Phone')
+        if not self._is_valid_phone(self.emergency_contact_phone):
+            missing.append('Emergency Contact Phone (invalid number — set Nationality for automatic country code, or include + code manually)')
         if not self.birth_certificate:
             missing.append('Birth Certificate')
         if self.class_id and not self.class_id.is_entry_level and not self.previous_grade_document:
