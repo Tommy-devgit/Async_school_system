@@ -1,25 +1,139 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="action_report_school_student" model="ir.actions.report">
-        <field name="name">Student Report</field>
-        <field name="model">school.student</field>
+    <record id="action_report_school_report_card" model="ir.actions.report">
+        <field name="name">Student Report Card</field>
+        <field name="model">school.report.card</field>
         <field name="report_type">qweb-pdf</field>
-        <field name="report_name">school_management.report_school_student_document</field>
-        <field name="report_file">school_management.report_school_student_document</field>
-        <field name="print_report_name">'Student Report - %s' % object.name</field>
-        <field name="binding_model_id" ref="model_school_student"/>
+        <field name="report_name">school_management.report_school_report_card</field>
+        <field name="report_file">school_management.report_school_report_card</field>
+        <field name="print_report_name">'Report Card - %s' % object.name</field>
+        <field name="binding_model_id" ref="model_school_report_card"/>
         <field name="binding_type">report</field>
     </record>
 
-    <template id="report_school_student_document">
+    <template id="report_school_report_card">
         <t t-call="web.html_container">
-            <t t-foreach="docs" t-as="student">
+            <t t-foreach="docs" t-as="card">
                 <t t-call="web.external_layout">
-                    <div class="page">
-                        <h2>Student Report</h2>
-                        <p><strong>Name:</strong> <span t-field="student.name"/></p>
-                        <p><strong>Student ID:</strong> <span t-esc="student.id"/></p>
-                        <!-- Add whatever fields school.student actually has, e.g. class_id, admission date, guardian, etc. -->
+                    <div class="page" style="font-size: 13px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #212529;">
+                        <div class="text-center mb-4 pb-2 border-bottom">
+                            <h2 class="fw-bold text-uppercase mb-1" style="letter-spacing: 1px;">Official Student Report Card</h2>
+                            <div class="text-muted small">
+                                <span t-esc="card.term_id.name"/> · <span t-esc="card.academic_year_id.name"/> · Version <span t-esc="card.version"/>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4 p-3 bg-light rounded border">
+                            <div class="col-6">
+                                <div class="mb-1"><strong>Student Name:</strong> <span t-esc="card.student_id.name"/></div>
+                                <div class="mb-1"><strong>Student ID:</strong> <span t-esc="card.student_id.id"/></div>
+                                <div><strong>Grade / Section:</strong> <span t-esc="card.class_id.name"/></div>
+                            </div>
+                            <div class="col-6 text-end">
+                                <div class="mb-1"><strong>Academic Year:</strong> <span t-esc="card.academic_year_id.name"/></div>
+                                <div class="mb-1"><strong>Term:</strong> <span t-esc="card.term_id.name"/></div>
+                                <div><strong>Grading Scheme:</strong> <span t-esc="card.grading_scheme_id.name"/></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5 class="fw-bold border-bottom pb-1 mb-2">Academic Performance</h5>
+                            <table class="table table-bordered table-sm align-middle">
+                                <thead class="table-dark text-center">
+                                    <tr>
+                                        <th class="text-start" style="width: 35%;">Subject</th>
+                                        <th style="width: 15%;">Score</th>
+                                        <th style="width: 15%;">Max Score</th>
+                                        <th style="width: 15%;">Percentage</th>
+                                        <th style="width: 10%;">Grade</th>
+                                        <th style="width: 10%;">Result</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="card.result_snapshot" t-as="line">
+                                        <td class="text-start fw-semibold"><t t-out="line.get('subject')"/></td>
+                                        <td class="text-center"><t t-out="'%.2f' % line.get('raw_total', 0.0)"/></td>
+                                        <td class="text-center"><t t-out="'%.2f' % line.get('maximum_total', 0.0)"/></td>
+                                        <td class="text-center fw-bold"><t t-out="'%.2f' % line.get('percentage', 0.0)"/>%</td>
+                                        <td class="text-center"><span class="badge bg-secondary"><t t-out="line.get('grade') or '-'"/></span></td>
+                                        <td class="text-center">
+                                            <span t-if="line.get('pass')" class="text-success fw-bold">PASS</span>
+                                            <span t-else="" class="text-danger fw-bold">FAIL</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-6">
+                                <div class="card h-100 border">
+                                    <div class="card-header bg-secondary text-white fw-bold py-1">Overall Performance</div>
+                                    <div class="card-body p-2">
+                                        <table class="table table-sm table-borderless mb-0">
+                                            <tr>
+                                                <th>Overall Average:</th>
+                                                <td class="text-end fw-bold"><span t-esc="'%.2f' % card.overall_average"/>%</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Final Status:</th>
+                                                <td class="text-end">
+                                                    <span t-if="card.result == 'pass'" class="badge bg-success text-uppercase">Passed</span>
+                                                    <span t-else="" class="badge bg-danger text-uppercase">Failed</span>
+                                                </td>
+                                            </tr>
+                                            <tr t-if="card.class_size &gt; 0">
+                                                <th>Class Rank:</th>
+                                                <td class="text-end fw-bold"><span t-esc="card.class_rank"/> / <span t-esc="card.class_size"/></td>
+                                            </tr>
+                                            <tr t-if="card.grade_size &gt; 0">
+                                                <th>Grade Rank:</th>
+                                                <td class="text-end fw-bold"><span t-esc="card.grade_rank"/> / <span t-esc="card.grade_size"/></td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-6">
+                                <div class="card h-100 border">
+                                    <div class="card-header bg-secondary text-white fw-bold py-1">Attendance Record</div>
+                                    <div class="card-body p-2">
+                                        <t t-if="card.attendance_summary">
+                                            <table class="table table-sm table-borderless mb-0">
+                                                <tr t-foreach="card.attendance_summary.items()" t-as="item">
+                                                    <th class="text-capitalize"><t t-out="item[0]"/>:</th>
+                                                    <td class="text-end"><t t-out="item[1]"/> Days</td>
+                                                </tr>
+                                            </table>
+                                        </t>
+                                        <t t-else="">
+                                            <div class="text-muted small text-center py-3">No attendance records registered for this term.</div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div t-if="card.correction_reason" class="alert alert-warning small p-2 mb-4 border">
+                            <strong>Correction Note:</strong> <span t-esc="card.correction_reason"/>
+                        </div>
+
+                        <div class="row pt-4 mt-4 border-top">
+                            <div class="col-4 text-center">
+                                <div class="border-bottom pb-4 mb-2"></div>
+                                <div class="small fw-bold">Homeroom Teacher</div>
+                            </div>
+                            <div class="col-4 text-center">
+                                <div class="border-bottom pb-4 mb-2"></div>
+                                <div class="small fw-bold">Examination Officer</div>
+                                <div class="text-muted small" t-if="card.approved_by_id">Approved: <span t-esc="card.approved_at" t-options="{'widget': 'date'}"/></div>
+                            </div>
+                            <div class="col-4 text-center">
+                                <div class="border-bottom pb-4 mb-2"></div>
+                                <div class="small fw-bold">Principal / Official Seal</div>
+                            </div>
+                        </div>
                     </div>
                 </t>
             </t>
