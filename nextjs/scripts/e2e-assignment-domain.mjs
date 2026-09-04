@@ -17,6 +17,7 @@
  *   E2E_ALLOW_WRITES=yes      required: this suite creates records
  */
 import { chromium } from 'playwright-core'
+import { assertWritable, isMutatingMethod } from './production-guard.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:3100'
 const ODOO = process.env.ODOO_BASE_URL ?? 'http://localhost:8070'
@@ -31,6 +32,8 @@ const check = (label, ok, extra = '') => {
 }
 
 async function odoo(sid, model, method, args = [], kwargs = {}) {
+  // Refused before the request is built, so a blocked write never reaches Odoo.
+  if (isMutatingMethod(method)) assertWritable(ODOO, `${model}.${method}()`)
   const response = await fetch(`${ODOO}/web/dataset/call_kw`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `session_id=${sid}` },
@@ -58,6 +61,17 @@ if (!LOGIN || process.env.E2E_ALLOW_WRITES !== 'yes') {
   console.log('\nassignment domain: SKIPPED — needs E2E_REGISTRAR_LOGIN and E2E_ALLOW_WRITES=yes')
   process.exit(0)
 }
+
+/*
+  Write intent is not permission.
+
+  Most of what this suite writes goes through the browser and the app, not
+  through `odoo()` above, so the client-level guard cannot see it. The only
+  lever on that traffic is refusing to start at all when the Odoo being driven
+  is not one we may write to. Absent configuration stays a skip; a run that
+  genuinely means to write, aimed at an unapproved host, is a hard failure.
+*/
+assertWritable(ODOO, 'the assignment domain suite')
 
 const sid = await odooLogin(LOGIN)
 const browser = await chromium.launch({ channel: 'chrome', headless: true })

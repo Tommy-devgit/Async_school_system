@@ -6,7 +6,13 @@
  *   node scripts/rpc.mjs <model> <method> '<json args>' '<json kwargs>'
  *
  * Env: ODOO_BASE_URL, ODOO_DB, ODOO_LOGIN, ODOO_PASSWORD
+ *
+ * Reads go anywhere. Writes go only where scripts/production-guard.mjs says
+ * they may — this client can create and delete res.users and school.student
+ * rows, and ODOO_BASE_URL is one stale shell variable away from production.
  */
+import { assertWritable, isMutatingMethod } from './production-guard.mjs'
+
 const URL_BASE = process.env.ODOO_BASE_URL ?? 'http://localhost:8090'
 const DB = process.env.ODOO_DB ?? 'school19'
 const LOGIN = process.env.ODOO_LOGIN
@@ -34,6 +40,8 @@ export async function login() {
 }
 
 export async function call(model, method, args = [], kwargs = {}) {
+  // Before the request, not after: a refused write must never reach the wire.
+  if (isMutatingMethod(method)) assertWritable(URL_BASE, `${model}.${method}()`)
   return jsonrpc('/web/dataset/call_kw', { model, method, args, kwargs })
 }
 
