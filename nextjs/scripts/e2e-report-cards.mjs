@@ -17,6 +17,7 @@
  * because only that role may generate or approve.
  */
 import { chromium } from 'playwright-core'
+import { assertWritable, isMutatingMethod } from './production-guard.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:3100'
 const ODOO = process.env.ODOO_BASE_URL ?? 'http://localhost:8070'
@@ -32,6 +33,8 @@ const check = (label, ok, extra = '') => {
 
 /** Read Odoo directly, so the assertion is about the database and not the page. */
 async function odoo(sid, model, method, args = [], kwargs = {}) {
+  // Refused before the request is built, so a blocked write never reaches Odoo.
+  if (isMutatingMethod(method)) assertWritable(ODOO, `${model}.${method}()`)
   const response = await fetch(`${ODOO}/web/dataset/call_kw`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `session_id=${sid}` },
@@ -137,8 +140,15 @@ if (drafts.length === 0) {
   A report card cannot be deleted — Odoo refuses, calling them permanent
   academic records — so this must never be pointed at a database whose
   contents matter.
+
+  Which is exactly why intent alone does not start it. Generation runs through
+  the browser, past the client guard on `odoo()`, so the destination is checked
+  here instead: unset means skip, set-but-aimed-somewhere-unapproved throws.
+  An undeletable record written to production is the worst outcome in this
+  repository, and it is one stale shell variable away.
 */
 if (process.env.E2E_ALLOW_WRITES === 'yes') {
+  assertWritable(ODOO, 'report card generation')
   console.log('\nOdoo → Next.js → Odoo: generating for a class')
   const before = await odoo(sid, 'school.report.card', 'search_count', [[]])
 
