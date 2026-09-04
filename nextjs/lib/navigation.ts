@@ -8,16 +8,31 @@ import type { SchoolRoles } from '@/lib/odoo/types'
  * call. What it encodes is the *measured* ACL coverage from staging, so nobody
  * is offered a door that opens onto a 403.
  *
- * Four record rules previously could not fire because the matching ACL row was
- * absent; those rows were added in security/ir.model.access.csv to match the
- * matrix in README.md, so Director and Front Office now read students, and
- * Director and Registrar read marks.
+ * This block described an ACL that had stopped being true. The four rows it
+ * credited — Director and Front Office on school.student, Director and
+ * Registrar on school.mark — were added deliberately, then deleted by a merge
+ * conflict resolution, so for a while the comment promised access the backend
+ * had lost. They are restored, along with the rest of the matrix README.md
+ * documents:
  *
- * Still absent from the CSV, and therefore still hidden here: Director has no
- * ACL row on school.teacher, school.class, school.subject, school.academic.year,
- * school.term or school.teacher.assignment, and Front Office has none on any
- * academic model. Widening those is an authorisation decision for the owner —
- * do not work around it in the frontend.
+ *   Director      read-only on students, marks, classes, attendance, the
+ *                 timetable, teaching assignments, teachers, announcements and
+ *                 programs. Unscoped, and no write, create or delete anywhere.
+ *   Front Office  reads every student, for contact lookup only.
+ *   Registrar     owns the timetable — full rights on school.class.schedule,
+ *                 which school.day.builder needs in order to create slots.
+ *
+ * Still absent, and therefore still hidden here: Director has no ACL row on
+ * school.subject, school.academic.year, school.term or school.section, and
+ * Front Office has none on any academic model beyond students. Widening those
+ * is an authorisation decision for the owner — do not work around it here.
+ *
+ * The predicates below have NOT been rewidened to match. Several are now
+ * narrower than the backend allows — Director can read classes, attendance,
+ * the timetable, assignments, teachers, announcements and programs but is
+ * offered none of them, and Registrar can build a timetable but is not offered
+ * /schedule. Correcting them is the navigation PR's job, not this file's
+ * documentation. Nothing here is a security boundary either way.
  *
  * The sections are the school's own domains rather than the module's table
  * names: somebody looking for "who is in Grade 7" reaches for People, not for

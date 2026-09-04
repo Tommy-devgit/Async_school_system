@@ -7,6 +7,7 @@ from . import test_attendance_roster
 from . import test_assessment
 # from . import test_results
 from . import test_security
+from . import test_authorization_policy
 from . import test_responsibility
 from . import test_staff_registration
 from . import test_staff_fayda_id
