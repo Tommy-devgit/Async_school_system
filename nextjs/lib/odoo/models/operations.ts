@@ -757,6 +757,54 @@ export function getDocument(id: number): Promise<DocumentRow | null> {
   return readOne<DocumentRow>('school.document', id, DOCUMENT_FIELDS)
 }
 
+export interface DocumentIntake {
+  name: string
+  documentTypeId: number
+  /** Exactly one owner — `_check_owner` refuses anything else. */
+  owner: { student_id: number } | { staff_id: number }
+  fileName: string
+  /** The file, base64 encoded. */
+  data: string
+  mimetype: string
+  expiryDate?: string
+}
+
+/**
+ * File a document against a student or a staff member.
+ *
+ * Two writes, because `school.document.attachment_id` is required and Odoo has
+ * no way to create the attachment inline: the `ir.attachment` goes first, then
+ * the document points at it. If the second write is refused the attachment is
+ * removed again, so a rejected upload leaves nothing behind.
+ *
+ * `attachment_id` and `sensitivity` are `groups=school_management.group_school_registrar`,
+ * so this works for the registrar and the administrator. HR holds create on
+ * school.document but not that group, and therefore cannot supply the required
+ * attachment — which is why the screen does not offer them the form.
+ */
+export async function createDocument(intake: DocumentIntake): Promise<number> {
+  const attachmentId = await create('ir.attachment', {
+    name: intake.fileName,
+    datas: intake.data,
+    mimetype: intake.mimetype,
+    res_model: 'school.document',
+  })
+
+  try {
+    return await create('school.document', {
+      name: intake.name,
+      document_type_id: intake.documentTypeId,
+      attachment_id: attachmentId,
+      expiry_date: intake.expiryDate || false,
+      ...intake.owner,
+    })
+  } catch (cause) {
+    // Best effort: a stranded attachment is invisible but not harmless.
+    await callKw('ir.attachment', 'unlink', [[attachmentId]]).catch(() => {})
+    throw cause
+  }
+}
+
 
 
 /* --------------------------------------------------------- configuration --- */
