@@ -13,17 +13,29 @@
 
 from dateutil.relativedelta import relativedelta
 from ethiopian_date import EthiopianDateConverter
-
 from odoo import fields
+
+from ..models.school_academic_year import ethiopian_year_of
+
+# `to_gregorian` is still the library's, and safely so: it builds a Gregorian
+# date, which can always be represented. Only the other direction can produce
+# the thirteenth month that `datetime.date` refuses.
 
 SEEDED_CURRENT_YEAR = 'school_management.academic_year_2026_2027'
 
 
 def ethiopian_year_name(date_start):
-    """The name `school.academic.year` expects for a year starting on this date."""
+    """The name `school.academic.year` expects for a year starting on this date.
+
+    Deliberately the model's own `ethiopian_year_of` rather than a second call
+    into the library: a fixture that names a year differently from the way the
+    constraint checks it would fail for reasons that have nothing to do with
+    the test. It also means these fixtures survive Pagumē, which the library
+    cannot represent.
+    """
     if isinstance(date_start, str):
         date_start = fields.Date.to_date(date_start)
-    return str(EthiopianDateConverter.date_to_ethiopian(date_start).year)
+    return str(ethiopian_year_of(date_start))
 
 
 def academic_year(env, date_start, date_end, **values):
