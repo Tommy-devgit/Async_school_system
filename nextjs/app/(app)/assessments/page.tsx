@@ -1,6 +1,5 @@
 import { DateText, LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { formatSelection } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
 import { classOptions, subjectOptions, termOptions } from '@/lib/odoo/filter-options'
@@ -61,7 +60,7 @@ export default async function AssessmentsPage({ searchParams }: PageProps<'/asse
           key: 'name',
           label: 'Assessment',
           sortField: 'name',
-          render: (row) => <RowLink href={`/assessments/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         {
           key: 'type',

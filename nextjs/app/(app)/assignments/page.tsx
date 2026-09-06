@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { canCreateAssignment, listAssignableTeachers } from '@/lib/odoo/models/assignment'
 import { formatSelection } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
@@ -75,7 +74,7 @@ export default async function AssignmentsPage({ searchParams }: PageProps<'/assi
         {
           key: 'teacher',
           label: 'Teacher',
-          render: (row) => <RowLink href={`/assignments/${row.id}`}>{m2oLabel(row.teacher_id)}</RowLink>,
+          render: (row) => m2oLabel(row.teacher_id),
         },
         { key: 'subject', label: 'Subject', render: (row) => m2oLabel(row.subject_id) },
         { key: 'class', label: 'Class', render: (row) => m2oLabel(row.class_id) },

@@ -1,6 +1,5 @@
 import { DateText, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { toOdooOrder } from '@/lib/list-query'
 import { documentTypeOptions } from '@/lib/odoo/filter-options'
 import { listDocuments } from '@/lib/odoo/models/operations'
@@ -49,7 +48,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<'/docume
           key: 'name',
           label: 'Document',
           sortField: 'name',
-          render: (row) => <RowLink href={`/documents/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         { key: 'type', label: 'Type', render: (row) => m2oLabel(row.document_type_id) },
         { key: 'owner', label: 'Owner', render: (row) => owner(row.student_id, row.staff_id) },

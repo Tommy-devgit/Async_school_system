@@ -1,6 +1,5 @@
 import { DateText, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { formatSelection, formatText } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
 import { academicYearOptions, classOptions } from '@/lib/odoo/filter-options'
@@ -49,7 +48,7 @@ export default async function EnrollmentsPage({ searchParams }: PageProps<'/enro
         {
           key: 'name',
           label: 'Enrolment',
-          render: (row) => <RowLink href={`/enrollments/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         { key: 'student', label: 'Student', render: (row) => m2oLabel(row.student_id) },
         { key: 'class', label: 'Class', render: (row) => m2oLabel(row.class_id) },

@@ -1,6 +1,5 @@
 import { LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { formatSelection, formatText } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
 import { listRooms, roomAccess } from '@/lib/odoo/models/facilities'
@@ -69,9 +68,7 @@ export default async function RoomsPage({ searchParams }: PageProps<'/rooms'>) {
           key: 'name',
           label: 'Room',
           sortField: 'name',
-          render: (row) => (
-            <RowLink href={`/rooms/${row.id}`}>{row.name}</RowLink>
-          ),
+          render: (row) => row.name,
         },
         {
           key: 'code',

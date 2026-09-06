@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { Badge, DateText, LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { formatSelection } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
 import { hasAccess } from '@/lib/odoo/client'
@@ -67,7 +66,7 @@ export default async function AnnouncementsPage({ searchParams }: PageProps<'/an
           key: 'name',
           label: 'Title',
           sortField: 'name',
-          render: (row) => <RowLink href={`/announcements/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         {
           key: 'category',

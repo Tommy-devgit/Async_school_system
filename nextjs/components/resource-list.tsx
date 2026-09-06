@@ -10,6 +10,7 @@ import {
   PageHeader,
   Pagination,
   Row,
+  RowLink,
   SortHeader,
   Toolbar,
   type Column,
@@ -199,7 +200,22 @@ export async function ResourceList<T extends { id: number }>({
                     hideBelow={column.hideBelow}
                     strong={column === columns[0]}
                   >
-                    {column.render(row)}
+                    {/*
+                      The link lives here, on the first cell, rather than in
+                      each screen's own render function.
+
+                      `rowHref` used to be handed to `Row` and quietly dropped —
+                      it only ever chose a hover colour — so a screen that
+                      relied on it alone had rows that went nowhere at all, and
+                      the fifteen screens that worked did so because each had
+                      built the same RowLink by hand. One mechanism, so a new
+                      list cannot be born dead.
+                    */}
+                    {column === columns[0] && rowHref ? (
+                      <RowLink href={rowHref(row)}>{column.render(row)}</RowLink>
+                    ) : (
+                      column.render(row)
+                    )}
                   </Cell>
                 ))}
               </Row>
