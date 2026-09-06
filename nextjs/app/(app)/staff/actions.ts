@@ -58,7 +58,8 @@ function validateIntake(form: FormData): { values?: StaffIntake; fieldErrors?: R
   if (!first_name) fieldErrors.first_name = 'First name is required.'
   if (!last_name) fieldErrors.last_name = 'Last name is required.'
   if (!department) fieldErrors.department = 'Choose a department.'
-  if (!jobTitle) fieldErrors.job_title_id = 'Choose a job title.'
+  const jobTitleId = relationalId(jobTitle)
+  if (!jobTitle || jobTitleId === null) fieldErrors.job_title_id = 'Choose a job title.'
   if (!responsibility) fieldErrors.responsibility = 'Choose a responsibility.'
   if (!employment_status) fieldErrors.employment_status = 'Choose an employment status.'
 
@@ -83,7 +84,8 @@ function validateIntake(form: FormData): { values?: StaffIntake; fieldErrors?: R
       first_name,
       last_name,
       department,
-      job_title_id: Number(jobTitle),
+      // Non-null past the fieldErrors return above, which the compiler cannot see.
+      job_title_id: jobTitleId as number,
       employment_status,
       responsibility,
       employment_type: text(form, 'employment_type') || undefined,
