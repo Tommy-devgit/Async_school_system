@@ -21,7 +21,7 @@ configures it.
 
 import base64
 
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase
 
 YEAR = '2041'
@@ -367,3 +367,37 @@ class TestRegistrarTimetable(AuthorizationCase):
         with self.assertRaises(AccessError):
             self.as_role('director', 'school.class.schedule').browse(slot.id).write(
                 {'start_time': 10.0})
+
+
+class TestDailyAttendanceIsHomeroomOnly(AuthorizationCase):
+    """Teaching a class lets you see its daily attendance; only the homeroom
+    teacher of the class may record or correct it."""
+
+    DATE = '2049-03-01'
+
+    def _values(self):
+        return {'student_id': self.student_own.id, 'date': self.DATE, 'status': 'present'}
+
+    def test_subject_teacher_cannot_record_daily_attendance(self):
+        self.assertFalse(self.class_own.homeroom_teacher_id)
+        with self.assertRaises(AccessError):
+            self.as_role('teacher', 'school.attendance').create(self._values())
+
+    def test_homeroom_teacher_records_daily_attendance(self):
+        self.class_own.homeroom_teacher_id = self.teacher
+        row = self.as_role('teacher', 'school.attendance').create(self._values())
+        self.assertEqual(row.class_id, self.class_own)
+        self.assertEqual(row.attendance_type, 'daily')
+
+    def test_subject_teacher_still_reads_daily_attendance(self):
+        row = self.env['school.attendance'].create(self._values())
+        self.assertEqual(
+            self.as_role('teacher', 'school.attendance').browse(row.id).status, 'present')
+
+    def test_roster_refuses_a_class_the_user_is_not_homeroom_for(self):
+        roster = self.env['school.attendance.roster'].with_user(self.roles['teacher']).create({
+            'class_id': self.class_own.id, 'date': self.DATE})
+        with self.assertRaises(ValidationError):
+            roster.action_generate()
+        self.class_own.homeroom_teacher_id = self.teacher
+        roster.action_generate()
