@@ -36,6 +36,7 @@ function checked(form: FormData, key: string): boolean {
   return String(form.getAll(key).at(-1) ?? '') === 'true'
 }
 
+// Checkbox-aware: see the note in classes/actions.ts.
 function submitted(form: FormData): Record<string, string> {
   return Object.fromEntries(
     FIELDS.map((f) => [f, BOOLEANS.has(f) ? String(checked(form, f)) : String(form.get(f) ?? '')]),

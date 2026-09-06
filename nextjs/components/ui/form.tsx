@@ -34,9 +34,10 @@ import { cx } from './primitives'
  * out of `FormResponse` below; a hand-written `<select>` needs
  * `key={`field-${useFormResponse(state)}`}` of its own.
  *
- * Keyed on the reply's identity rather than its contents, because submitting
- * the same wrong values twice is exactly when the user most needs the second
- * refusal to behave like the first.
+ * Keyed on the reply's identity rather than its contents. A contents hash
+ * would work too — a repeated refusal echoes the same values, so the node from
+ * the last rebuild already holds them — but identity needs no hashing and says
+ * plainly what it counts: replies, not values.
  */
 export function useFormResponse(state: unknown): number {
   // React's own "adjusting state during render" pattern, so the new count is

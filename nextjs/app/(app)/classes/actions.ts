@@ -42,6 +42,8 @@ function checked(form: FormData, key: string): boolean {
   return String(form.getAll(key).at(-1) ?? '') === 'true'
 }
 
+// Checkbox-aware: `active` arrives as a hidden "false" followed by the box's
+// "true", so the last value wins. lib/form-values only handles scalars.
 function submitted(form: FormData): Record<string, string> {
   return Object.fromEntries(
     ALL_FIELDS.map((field) => [

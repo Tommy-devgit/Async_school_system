@@ -326,6 +326,71 @@ for (const undo of cleanup.reverse()) {
   }
 }
 
+/* ------------------------------ a repeated refusal keeps the form intact --- */
+
+/*
+  The same wrong values twice.
+
+  This form used to key its rebuild on `JSON.stringify(state.values)`, so a
+  second identical refusal produced the same key, skipped the rebuild, and let
+  React 19's post-action reset put the *stored* values back — silently undoing
+  what the first refusal had kept. On a reschedule that is how somebody supplies
+  a reason for a day change and saves the original day believing it moved.
+*/
+console.log('\na second identical refusal keeps what the first one kept')
+
+await page.goto(`${BASE}/schedule/new`, { waitUntil: 'domcontentloaded' })
+await page.locator('#assignmentId').waitFor({ timeout: 30_000 })
+
+const anAssignment = await page
+  .locator('#assignmentId option')
+  .nth(1)
+  .getAttribute('value')
+  .catch(() => null)
+
+if (!anAssignment) {
+  console.log('  SKIPPED — no teacher assignment to schedule against')
+} else {
+  await page.selectOption('#assignmentId', anAssignment)
+  await page.selectOption('#dayOfWeek', '2')
+  await page.fill('#notes', 'Repeat refusal probe')
+  // Refused by validation, before anything is written: the period would end
+  // before it starts.
+  await page.fill('#startTime', '11:00')
+  await page.fill('#endTime', '10:00')
+
+  const readBack = async () => ({
+    assignment: await page.inputValue('#assignmentId'),
+    day: await page.inputValue('#dayOfWeek'),
+    notes: await page.inputValue('#notes'),
+    start: await page.inputValue('#startTime'),
+    end: await page.inputValue('#endTime'),
+  })
+
+  const entered = await readBack()
+  const submit = async () => {
+    await page.locator('main form button[type="submit"]').first().click()
+    await page
+      .getByText(/has to end after it starts/i)
+      .first()
+      .waitFor({ state: 'visible', timeout: 30_000 })
+  }
+
+  await submit()
+  const first = await readBack()
+  for (const field of Object.keys(entered)) {
+    check(`first refusal: ${field} kept`, first[field] === entered[field], `${entered[field]} → ${first[field]}`)
+  }
+
+  await submit()
+  const second = await readBack()
+  for (const field of Object.keys(entered)) {
+    check(`second refusal: ${field} kept`, second[field] === entered[field], `${entered[field]} → ${second[field]}`)
+  }
+
+  check('it never navigated away', page.url().includes('/schedule/new'), page.url())
+}
+
 await browser.close()
 console.log(failures === 0 ? '\ntimetable authoring: ok' : `\ntimetable authoring: ${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

@@ -2,7 +2,14 @@
 
 import { useActionState, useState } from 'react'
 import { Button, Card, Note, cx } from '@/components/ui'
-import { Field, FormActions, FormError, INPUT_CLASS, INPUT_INVALID } from '@/components/ui/form'
+import {
+  Field,
+  FormActions,
+  FormError,
+  INPUT_CLASS,
+  INPUT_INVALID,
+  useFormResponse,
+} from '@/components/ui/form'
 import { createPromotionBatchAction, type PromotionFormState } from './actions'
 
 /**
@@ -63,7 +70,15 @@ export function PromotionForm({
   */
   const [yearId, setYearId] = useState(value('academicYearId'))
   const [gradeId, setGradeId] = useState(value('gradeId'))
-  const formKey = state.values ? JSON.stringify(state.values) : 'initial'
+  /*
+    Keyed on the reply's identity rather than a hash of its contents.
+
+    Both are correct here — a repeated refusal carries the same echo, so the
+    node from the last rebuild already holds the right values, and I checked
+    that the contents key passes the same test. This is the shared mechanism
+    every other form uses, and one fewer hand-rolled hash to reason about.
+  */
+  const formKey = useFormResponse(state)
 
   const scoped = classes.filter(
     (row) => String(row.yearId) === yearId && String(row.gradeId) === gradeId,

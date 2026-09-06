@@ -43,6 +43,8 @@ const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/
 const PASSWORD_HELP =
   'At least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol.'
 
+// Trims, unlike `submitted` in lib/form-values — kept because this form's
+// validation compares against the trimmed value.
 const submitted = (form: FormData) =>
   Object.fromEntries(INTAKE_FIELDS.map((f) => [f, text(form, f)]))
 
