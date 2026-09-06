@@ -336,12 +336,17 @@ class TestRecordScopeSurvives(AuthorizationCase):
         these two tests are about, and going through it would make them fail
         for reasons unrelated to who may read the row.
         """
-        scheme = self.env['school.grading.scheme'].search([], limit=1)
+        # Built rather than borrowed from whatever the database happens to
+        # hold: reusing an existing scheme left this creation path running only
+        # on a clean CI database, where it failed on field names no local run
+        # ever reached.
+        scheme = self.env['school.grading.scheme'].search([('name', '=', 'AUTH Scheme')], limit=1)
         if not scheme:
             scheme = self.env['school.grading.scheme'].create({
-                'name': 'AUTH Scheme', 'pass_percentage': 50.0,
+                'name': 'AUTH Scheme',
+                'pass_percentage': 50.0,
                 'band_ids': [(0, 0, {
-                    'name': 'A', 'min_percentage': 0.0, 'max_percentage': 100.0,
+                    'name': 'A', 'minimum_percentage': 0.0, 'maximum_percentage': 100.0,
                 })],
             })
         enrollment = self.env['school.enrollment'].search(
