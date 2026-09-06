@@ -85,7 +85,6 @@ const admin = await odooLogin(ADMIN)
 const STAMP = Date.now()
 const FIRST = 'Lifecycle'
 const LAST = `Probe ${STAMP}`
-const FULL = `${FIRST} ${LAST}`
 
 /** Everything created, newest first, so cleanup can unwind in order. */
 const created = []
