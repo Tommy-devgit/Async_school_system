@@ -67,6 +67,7 @@ export default async function SchedulePage({ searchParams }: PageProps<'/schedul
         })
       }
       rowHref={(row) => `/schedule/${row.id}`}
+      removable="schedule"
       emptyTitle="No timetable slots visible"
       emptyHint="Teachers see only their own slots."
       columns={[

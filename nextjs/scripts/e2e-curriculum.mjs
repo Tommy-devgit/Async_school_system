@@ -49,6 +49,15 @@ async function signIn(login) {
 
 const bodyRows = (page) => page.locator('main table tbody tr')
 
+/*
+  Column positions shift by one on a list the signed-in user may remove from,
+  because those lead with a selection checkbox. Worked out from the page rather
+  than assumed, so these checks stay pointed at the column they name.
+*/
+async function columnOffset(page) {
+  return (await page.locator('main tbody tr td input[name="id"]').count()) > 0 ? 1 : 0
+}
+
 /* ------------------------------------------------------- it lists at all --- */
 
 console.log('\nthe curriculum lists')
@@ -75,7 +84,9 @@ if (listed === 0) {
 /* ------------------------------------------------------------ it narrows --- */
 
 console.log('\nsearching narrows it to something real')
-const subjectCell = (await bodyRows(page).first().locator('td').nth(1).textContent()) ?? ''
+const offset = await columnOffset(page)
+const subjectCell =
+  (await bodyRows(page).first().locator('td').nth(1 + offset).textContent()) ?? ''
 const needle = subjectCell.trim().split(/\s+/)[0]
 check('a subject name was read off the first row', Boolean(needle), needle)
 
@@ -96,7 +107,8 @@ await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 
 // Read the class off the first row, then find the filter option that names it,
 // so the id under test comes from the screen rather than from a guess.
-const firstClass = ((await bodyRows(page).first().locator('td').first().textContent()) ?? '').trim()
+const firstClass =
+  ((await bodyRows(page).first().locator('td').nth(await columnOffset(page)).textContent()) ?? '').trim()
 const classSelect = page.locator('select').filter({ hasText: firstClass }).first()
 const classId =
   (await classSelect.count()) > 0
@@ -110,7 +122,9 @@ const classId =
 if (classId) {
   await page.goto(`${BASE}/curriculum?class=${classId}`, { waitUntil: 'domcontentloaded' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
-  const classes = await bodyRows(page).locator('td:nth-child(1)').allTextContents()
+  const classes = await bodyRows(page)
+    .locator(`td:nth-child(${1 + (await columnOffset(page))})`)
+    .allTextContents()
   check('the filter returned rows', classes.length > 0, `${classes.length} row(s)`)
   check(
     'every row is that class',
@@ -163,7 +177,9 @@ const column = async (field, direction, nth) => {
     waitUntil: 'domcontentloaded',
   })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
-  const cells = await bodyRows(page).locator(`td:nth-child(${nth})`).allTextContents()
+  const cells = await bodyRows(page)
+    .locator(`td:nth-child(${nth + (await columnOffset(page))})`)
+    .allTextContents()
   return cells.map((value) => value.trim())
 }
 

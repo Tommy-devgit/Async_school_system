@@ -41,6 +41,7 @@ export default async function AcademicYearsPage({ searchParams }: PageProps<'/ac
           </LinkButton>
         ) : undefined
       }
+      removable="academicYear"
       emptyTitle="No academic years visible"
       columns={[
         {

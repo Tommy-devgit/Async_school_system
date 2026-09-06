@@ -53,6 +53,7 @@ export default async function StudentsPage({ searchParams }: PageProps<'/student
         ) : undefined
       }
       rowHref={(row) => `/students/${row.id}`}
+      removable="student"
       emptyTitle="No students visible"
       emptyHint="Odoo scopes this list to the records your role may see."
       emptyAction={

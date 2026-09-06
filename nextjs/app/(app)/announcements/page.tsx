@@ -59,6 +59,7 @@ export default async function AnnouncementsPage({ searchParams }: PageProps<'/an
           ) : null}
         </div>
       }
+      removable="announcement"
       emptyTitle="No announcements visible"
       emptyHint="You see the ones you authored and the ones addressed to you."
       columns={[

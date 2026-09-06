@@ -53,6 +53,7 @@ export default async function AssessmentsPage({ searchParams }: PageProps<'/asse
           </LinkButton>
         ) : undefined
       }
+      removable="assessment"
       emptyTitle="No assessments visible"
       emptyHint="A teacher sees assessments for their own exact assignment only."
       columns={[

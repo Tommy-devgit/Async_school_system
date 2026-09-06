@@ -61,6 +61,7 @@ export default async function RoomsPage({ searchParams }: PageProps<'/rooms'>) {
         ) : undefined
       }
       rowHref={(row) => `/rooms/${row.id}`}
+      removable="room"
       emptyTitle="No rooms yet"
       emptyHint="A class and a timetable slot both point at a room, so this is usually the first thing a school sets up."
       columns={[

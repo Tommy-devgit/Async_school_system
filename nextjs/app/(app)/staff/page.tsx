@@ -52,6 +52,7 @@ export default async function StaffPage({ searchParams }: PageProps<'/staff'>) {
         ) : undefined
       }
       rowHref={(row) => `/staff/${row.id}`}
+      removable="staff"
       emptyTitle="No staff visible"
       emptyHint="Odoo scopes this list to the records your role may see — Front Office sees only its own."
       columns={[
