@@ -3,6 +3,7 @@ import { DateText, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
 import { formatSelection, formatText } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
+import { hasAccess } from '@/lib/odoo/client'
 import { listPrograms } from '@/lib/odoo/models/operations'
 import { selectionOptions } from '@/lib/odoo/selections'
 import { m2oLabel } from '@/lib/odoo/types'
@@ -10,10 +11,11 @@ import { m2oLabel } from '@/lib/odoo/types'
 export const metadata = { title: 'Programs · Async School' }
 
 export default async function ProgramsPage({ searchParams }: PageProps<'/programs'>) {
-  const [states, types, audiences] = await Promise.all([
+  const [states, types, audiences, canCreate] = await Promise.all([
     selectionOptions('school.program', 'state'),
     selectionOptions('school.program', 'program_type'),
     selectionOptions('school.program', 'audience_type'),
+    hasAccess('school.program', 'create'),
   ])
 
   return (
@@ -25,12 +27,23 @@ export default async function ProgramsPage({ searchParams }: PageProps<'/program
       subtitle="Events and activities on the school calendar."
       search={{ placeholder: 'Program name or location' }}
       action={
-        <Link
-          href="/programs/calendar"
-          className="rounded-[9999px] border border-silver px-4 py-2 text-[13px] hover:bg-paper"
-        >
-          Calendar
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/programs/calendar"
+            className="rounded-[9999px] border border-silver px-4 py-2 text-[13px] hover:bg-paper"
+          >
+            Calendar
+          </Link>
+          {/* Only where Odoo would accept the create — director and teacher read only. */}
+          {canCreate ? (
+            <Link
+              href="/programs/new"
+              className="rounded-[9999px] bg-ink px-4 py-2 text-[13px] text-white hover:bg-graphite"
+            >
+              New program
+            </Link>
+          ) : null}
+        </div>
       }
       filters={[
         { key: 'status', label: 'Status', options: states },
