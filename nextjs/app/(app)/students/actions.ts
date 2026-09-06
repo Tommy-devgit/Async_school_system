@@ -983,11 +983,16 @@ export async function saveAnswersAction(
     // not a hundred pointless writes.
     if (optionRaw === wasOption && textRaw === wasText) continue
 
+    const optionId = relationalId(optionRaw)
+    if (optionId === null) {
+      return { error: 'That answer could not be read.', values: submittedAnswers(form) }
+    }
+
     try {
       await saveAnswer(studentId, questionId, {
         id: Number.isInteger(existing) && existing > 0 ? existing : undefined,
         value_text: textRaw || false,
-        option_id: relationalId(optionRaw) ?? false,
+        option_id: optionId,
       })
       saved += 1
     } catch (cause) {

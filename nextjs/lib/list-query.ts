@@ -11,6 +11,9 @@
 
 export type SortDirection = 'asc' | 'desc'
 
+/** Far past any real result set, and small enough that page × size stays exact. */
+const MAX_PAGE = 1_000_000
+
 export interface ListQuery {
   /** The free-text term, already trimmed. */
   search?: string
@@ -62,7 +65,11 @@ export function parseListQuery(
         ? (defaultSort?.direction ?? 'asc')
         : 'asc'
 
-  const page = Math.max(1, Number(one(params, 'page') ?? '1') || 1)
+  // Floored, so `?page=1.5` cannot reach Odoo as a fractional OFFSET, and
+  // capped, so `?page=1e400` cannot reach it as Infinity — which has no JSON
+  // form and arrives as null.
+  const requested = Math.floor(Number(one(params, 'page') ?? '1')) || 1
+  const page = Math.min(Math.max(1, requested), MAX_PAGE)
 
   return {
     search: one(params, 'q'),
