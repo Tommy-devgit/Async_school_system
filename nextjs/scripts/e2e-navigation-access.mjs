@@ -38,12 +38,12 @@ const ROLES = {
 
 /** What the menu is expected to offer, mirroring test-navigation-access.mjs. */
 const EXPECTED_COUNT = {
-  admin: 23,
-  director: 16,
-  registrar: 21,
-  teacher: 19,
+  admin: 24,
+  director: 17,
+  registrar: 22,
+  teacher: 20,
   frontoffice: 6,
-  exam: 12,
+  exam: 13,
   hr: 4,
 }
 

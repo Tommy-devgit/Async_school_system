@@ -795,16 +795,42 @@ export function updateCurriculumLine(
   return write('school.grade.subject', [id], values)
 }
 
-export function listCurriculum(options: { classId?: number } = {}): Promise<
-  Page<GradeSubjectRow>
-> {
+export const CURRICULUM_FILTERS = {
+  class: { field: 'class_id', kind: 'many2one' },
+  subject: { field: 'subject_id', kind: 'many2one' },
+  type: { field: 'subject_type' },
+  active: { field: 'active', kind: 'boolean' },
+} as const
+
+/**
+ * The curriculum, as a list screen or as one class's lines.
+ *
+ * `classId` is the Configuration page's older call, which wants every line at
+ * once rather than a page of them; the ListOptions are the /curriculum screen.
+ *
+ * Searching matches the class and the subject by name — Odoo turns `ilike` on
+ * a many2one into a name lookup, which is what someone typing "Grade 8" or
+ * "Biology" into the box means.
+ *
+ * Note the `active` filter is not cosmetic: `school.grade.subject` carries an
+ * `active` field, so Odoo hides archived lines unless the domain names it.
+ * Passing the filter through is what makes them reachable at all.
+ */
+export function listCurriculum(
+  options: ListOptions & { classId?: number } = {},
+): Promise<Page<GradeSubjectRow>> {
   return searchRead<GradeSubjectRow>(
     'school.grade.subject',
     ['class_id', 'subject_id', 'subject_type', 'maximum_mark', 'pass_mark', 'active'],
     {
-      domain: options.classId ? [['class_id', '=', options.classId]] : [],
-      limit: 200,
-      order: 'class_id, subject_id',
+      domain: listDomain(options, {
+        base: options.classId ? [['class_id', '=', options.classId]] : [],
+        searchFields: ['class_id', 'subject_id'],
+        filters: CURRICULUM_FILTERS,
+      }),
+      limit: options.limit ?? 200,
+      offset: options.offset ?? 0,
+      order: options.order ?? 'class_id, subject_id',
     },
   )
 }
