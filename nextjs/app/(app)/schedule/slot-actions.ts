@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+import { submitted } from '@/lib/form-values'
 import { clockToFloat } from '@/lib/format'
 import {
   createSlot,
@@ -58,10 +59,6 @@ const DAYS = new Set(['0', '1', '2', '3', '4', '5', '6'])
 
 function text(form: FormData, key: string): string {
   return String(form.get(key) ?? '').trim()
-}
-
-function submitted(form: FormData): Record<string, string> {
-  return Object.fromEntries(FORM_FIELDS.map((field) => [field, String(form.get(field) ?? '')]))
 }
 
 interface Timing {
@@ -139,7 +136,7 @@ export async function createSlotAction(
   if (!Number.isInteger(assignmentId) || assignmentId <= 0) {
     errors.assignmentId = 'Choose the teacher assignment this period belongs to.'
   }
-  if (Object.keys(errors).length > 0) return { fieldErrors: errors, values: submitted(form) }
+  if (Object.keys(errors).length > 0) return { fieldErrors: errors, values: submitted(form, FORM_FIELDS) }
 
   /*
     The class, subject, term and teacher come from the assignment record, never
@@ -150,7 +147,7 @@ export async function createSlotAction(
   if (!assignment) {
     return {
       error: 'That teacher assignment is no longer active, so a period cannot be built on it.',
-      values: submitted(form),
+      values: submitted(form, FORM_FIELDS),
     }
   }
 
@@ -158,7 +155,7 @@ export async function createSlotAction(
   try {
     id = await createSlot(timing!, assignment)
   } catch (cause) {
-    return { error: toOdooError(cause).message, values: submitted(form) }
+    return { error: toOdooError(cause).message, values: submitted(form, FORM_FIELDS) }
   }
 
   revalidatePath('/schedule')
@@ -178,7 +175,7 @@ export async function updateSlotAction(
   if (!Number.isInteger(id) || id <= 0) return { error: 'That slot could not be identified.' }
 
   const { timing, fieldErrors } = collectTiming(form)
-  if (fieldErrors) return { fieldErrors, values: submitted(form) }
+  if (fieldErrors) return { fieldErrors, values: submitted(form, FORM_FIELDS) }
 
   const slot = await getScheduleDetail(id)
   if (!slot) return { error: 'That slot no longer exists.' }
@@ -202,14 +199,14 @@ export async function updateSlotAction(
         rescheduleReason:
           'Say why this lesson is moving. The previous day and times stay in the record.',
       },
-      values: submitted(form),
+      values: submitted(form, FORM_FIELDS),
     }
   }
 
   try {
     await updateSlot(id, timing!, moved && live ? { reason } : undefined)
   } catch (cause) {
-    return { error: toOdooError(cause).message, values: submitted(form) }
+    return { error: toOdooError(cause).message, values: submitted(form, FORM_FIELDS) }
   }
 
   revalidatePath('/schedule')

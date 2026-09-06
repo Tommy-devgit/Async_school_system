@@ -41,10 +41,6 @@ const INTAKE_FIELDS = [
   'employment_type', 'employment_status', 'hire_date', 'responsibility',
 ] as const
 
-function submittedValues(form: FormData): Record<string, string> {
-  return Object.fromEntries(INTAKE_FIELDS.map((f) => [f, String(form.get(f) ?? '')]))
-}
-
 function text(form: FormData, key: string): string {
   return String(form.get(key) ?? '').trim()
 }
@@ -100,7 +96,7 @@ export async function registerStaffAction(
 ): Promise<FormState> {
   await requireSession()
   const { values, fieldErrors } = validateIntake(form)
-  if (fieldErrors) return { fieldErrors, values: submittedValues(form) }
+  if (fieldErrors) return { fieldErrors, values: submitted(form, INTAKE_FIELDS) }
 
   let id: number
   try {
@@ -108,7 +104,7 @@ export async function registerStaffAction(
   } catch (cause) {
     // Odoo's ValidationError messages are written for end users — the Fayda
     // duplicate, the minimum-age rule, the phone clash. Surface them as-is.
-    return { error: toOdooError(cause).message, values: submittedValues(form) }
+    return { error: toOdooError(cause).message, values: submitted(form, INTAKE_FIELDS) }
   }
 
   revalidatePath('/staff')

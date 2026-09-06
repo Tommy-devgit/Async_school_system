@@ -74,12 +74,6 @@ function text(form: FormData, key: string): string {
   return String(form.get(key) ?? '').trim()
 }
 
-function submitted(form: FormData): Record<string, string> {
-  return Object.fromEntries(
-    INTAKE_FIELDS.map((f) => [f, String(form.get(f) ?? '')]),
-  )
-}
-
 /**
  * Register a student in Draft.
  *
@@ -239,7 +233,7 @@ export async function registerStudentAction(
   if (Object.keys(fieldErrors).length > 0) {
     return {
       fieldErrors,
-      values: submitted(form),
+      values: submittedFields(form, INTAKE_FIELDS),
     }
   }
 
@@ -265,7 +259,7 @@ export async function registerStudentAction(
   } catch (cause) {
     return {
       error: toOdooError(cause).message,
-      values: submitted(form),
+      values: submittedFields(form, INTAKE_FIELDS),
     }
   }
 
@@ -273,7 +267,7 @@ export async function registerStudentAction(
     return {
       error:
         'That class has no academic year, so a student cannot be registered against it.',
-      values: submitted(form),
+      values: submittedFields(form, INTAKE_FIELDS),
     }
   }
 
@@ -355,7 +349,7 @@ export async function registerStudentAction(
     return {
       error: 'Please upload a birth certificate.',
       fieldErrors,
-      values: submitted(form),
+      values: submittedFields(form, INTAKE_FIELDS),
     }
   }
 
@@ -379,7 +373,7 @@ export async function registerStudentAction(
   if (Object.keys(fieldErrors).length > 0) {
     return {
       fieldErrors,
-      values: submitted(form),
+      values: submittedFields(form, INTAKE_FIELDS),
     }
   }
 
@@ -491,7 +485,7 @@ export async function registerStudentAction(
   } catch (cause) {
     return {
       error: toOdooError(cause).message,
-      values: submitted(form),
+      values: submittedFields(form, INTAKE_FIELDS),
     }
   }
 
@@ -538,7 +532,7 @@ export async function registerStudentAction(
       error:
         `Student was created, but the document upload failed: ` +
         toOdooError(cause).message,
-      values: submitted(form),
+      values: submittedFields(form, INTAKE_FIELDS),
     }
   }
 

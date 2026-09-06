@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+import { submitted } from '@/lib/form-values'
 import {
   createPromotionBatch,
   promotionFormOptions,
@@ -46,10 +47,6 @@ function text(form: FormData, key: string): string {
   return String(form.get(key) ?? '').trim()
 }
 
-function submitted(form: FormData): Record<string, string> {
-  return Object.fromEntries(FORM_FIELDS.map((field) => [field, String(form.get(field) ?? '')]))
-}
-
 export async function createPromotionBatchAction(
   _previous: PromotionFormState,
   form: FormData,
@@ -86,7 +83,7 @@ export async function createPromotionBatchAction(
   }
 
   if (Object.keys(fieldErrors).length > 0) {
-    return { fieldErrors, values: submitted(form) }
+    return { fieldErrors, values: submitted(form, FORM_FIELDS) }
   }
 
   const { years, classes } = await promotionFormOptions()
@@ -94,7 +91,7 @@ export async function createPromotionBatchAction(
   const target = years.find((option) => option.id === targetYearId)
 
   if (!year || !target) {
-    return { error: 'One of those academic years no longer exists.', values: submitted(form) }
+    return { error: 'One of those academic years no longer exists.', values: submitted(form, FORM_FIELDS) }
   }
 
   // Mirrors _check_academic_years; Odoo still enforces it on create.
@@ -103,7 +100,7 @@ export async function createPromotionBatchAction(
       fieldErrors: {
         targetAcademicYearId: `${target.name} starts before ${year.name} ends, so students cannot move into it.`,
       },
-      values: submitted(form),
+      values: submitted(form, FORM_FIELDS),
     }
   }
 
@@ -127,7 +124,7 @@ export async function createPromotionBatchAction(
         `A promotion batch for this grade and year already exists and has not been applied ` +
         `("${clashes[0].name}"). Finish or delete that one rather than starting a second, ` +
         `or the same students would be advanced twice.`,
-      values: submitted(form),
+      values: submitted(form, FORM_FIELDS),
     }
   }
 
@@ -142,7 +139,7 @@ export async function createPromotionBatchAction(
       maxFailedSubjects: maxFailed,
     })
   } catch (cause) {
-    return { error: toOdooError(cause).message, values: submitted(form) }
+    return { error: toOdooError(cause).message, values: submitted(form, FORM_FIELDS) }
   }
 
   revalidatePath('/promotion')

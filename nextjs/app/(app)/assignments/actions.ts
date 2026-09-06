@@ -38,6 +38,8 @@ const FORM_FIELDS = [
   'responsibility', 'teaching_role', 'weekly_periods', 'start_date', 'end_date',
 ] as const
 
+// Trims, unlike `submitted` in lib/form-values — kept because this form's
+// validation compares against the trimmed value.
 const submitted = (form: FormData) => Object.fromEntries(FORM_FIELDS.map((f) => [f, text(form, f)]))
 
 function requiredId(form: FormData, key: string): number | null {
