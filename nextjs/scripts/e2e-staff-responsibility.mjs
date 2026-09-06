@@ -104,14 +104,14 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
 await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
 const openStaff = async () => {
-  await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 }
 
@@ -185,13 +185,13 @@ if (TEACHER) {
   console.log('\na read-only role is offered no edit control')
   const readerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const reader = await readerContext.newPage()
-  await reader.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await reader.fill('#login', TEACHER)
   await reader.fill('#password', PASSWORD)
   await reader.click('#submit-login')
   await reader.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
-  await reader.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
   await reader.locator('main h1').first().waitFor({ timeout: 30_000 }).catch(() => {})
 
   // Without this the two checks below would also pass on an error page, which

@@ -44,7 +44,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -81,7 +81,7 @@ const LISTS = [
 ]
 
 for (const [route, expectSearch] of LISTS) {
-  await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' })
   const refused = /Not available to your role/i.test((await page.textContent('body')) ?? '')
   if (refused) {
     console.log(`  SKIP  ${route.padEnd(17)} refused for this role`)
@@ -99,7 +99,7 @@ for (const [route, expectSearch] of LISTS) {
 /* ---------------------------------------------------------------- search --- */
 
 console.log('\nsearch narrows the query, not the page')
-await page.goto(`${BASE}/students`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/students`, { waitUntil: 'networkidle' })
 const allStudents = await total(page)
 check('students load', allStudents !== null && allStudents > 0, `total=${allStudents}`)
 
@@ -115,14 +115,14 @@ const searched = await total(page)
 check('search reduces the total', searched !== null && searched <= allStudents, `→ ${searched}`)
 check('search is in the URL', page.url().includes('q='), page.url())
 
-await page.goto(`${BASE}/students?q=zzz-no-such-student`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/students?q=zzz-no-such-student`, { waitUntil: 'networkidle' })
 check('no match shows the narrowed empty state', /Nothing matches those filters/i.test((await page.textContent('body')) ?? ''))
 check('and offers a way back', (await page.locator('main a:has-text("Clear filters")').count()) > 0)
 
 /* ---------------------------------------------------------------- filter --- */
 
 console.log('\nfilters reach Odoo')
-await page.goto(`${BASE}/students`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/students`, { waitUntil: 'networkidle' })
 const statusSelect = page.locator('main select').first()
 const options = await statusSelect.locator('option').evaluateAll((nodes) =>
   nodes.map((n) => n.value).filter(Boolean),
@@ -143,9 +143,9 @@ if (options.length) {
 /* ------------------------------------------------------------------ sort --- */
 
 console.log('\nsorting is a server query')
-await page.goto(`${BASE}/students?sort=name:asc`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/students?sort=name:asc`, { waitUntil: 'networkidle' })
 const ascending = await (await firstDataCell(page)).allTextContents()
-await page.goto(`${BASE}/students?sort=name:desc`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/students?sort=name:desc`, { waitUntil: 'networkidle' })
 const descending = await (await firstDataCell(page)).allTextContents()
 check('descending differs from ascending', ascending.join('|') !== descending.join('|'))
 check(
@@ -157,13 +157,13 @@ check(
   'the sorted column is announced',
   (await page.locator('main th[aria-sort="descending"]').count()) === 1,
 )
-await page.goto(`${BASE}/students?sort=not_a_field:asc`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/students?sort=not_a_field:asc`, { waitUntil: 'networkidle' })
 check('an unknown sort field is ignored, not passed on', (await rowCount(page)) > 0)
 
 /* ------------------------------------------------------------------ page --- */
 
 console.log('\npaging')
-await page.goto(`${BASE}/staff`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/staff`, { waitUntil: 'networkidle' })
 const staffTotal = await total(page)
 const firstPage = await (await firstDataCell(page)).allTextContents()
 if ((staffTotal ?? 0) > 25) {
@@ -188,7 +188,7 @@ for (const url of [
   '/attendance?date=nonsense',
   '/students?unknown=1',
 ]) {
-  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' })
+  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'networkidle' })
   const body = (await page.textContent('body')) ?? ''
   check(
     `${url.padEnd(34)} renders`,
@@ -218,7 +218,7 @@ const LINKED_LISTS = [
 ]
 
 for (const url of LINKED_LISTS) {
-  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' })
+  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'networkidle' })
   if (response?.status() !== 200) {
     console.log(`    ${url.padEnd(18)} http=${response?.status()} — skipped`)
     continue

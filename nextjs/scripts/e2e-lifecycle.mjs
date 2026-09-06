@@ -106,7 +106,7 @@ let markId = null
 let reportCardId = null
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', REGISTRAR)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -163,7 +163,7 @@ try {
   check('the student record exists', Number.isInteger(studentId), `#${studentId}`)
 
   // The screen is the thing under test here: it must show what was just made.
-  await page.goto(`${BASE}/students/${studentId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/students/${studentId}`, { waitUntil: 'networkidle' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
   const shown = (await page.locator('main').textContent()) ?? ''
   check('the app shows the new student', shown.includes(LAST))

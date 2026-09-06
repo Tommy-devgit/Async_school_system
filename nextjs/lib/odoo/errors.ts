@@ -159,6 +159,17 @@ export function toOdooError(cause: unknown): OdooError {
 }
 
 /**
+ * Codes that mean "you may not see this" or "it is not there" — the answers a
+ * panel can legitimately render as empty.
+ *
+ * Everything else describes the server, not the caller's permissions: a
+ * timeout, an unreachable Odoo, an unhandled fault. Those must not resolve to
+ * null, because null is indistinguishable from an empty result and turns an
+ * outage into a page that calmly reports no students.
+ */
+const REFUSAL_CODES = new Set<OdooErrorCode>(['FORBIDDEN', 'NOT_FOUND'])
+
+/**
  * Resolve to null when Odoo refuses the read, while letting framework errors
  * through.
  *
@@ -166,12 +177,23 @@ export function toOdooError(cause: unknown): OdooError {
  * panel must not fail a whole page. A bare `catch` here would also swallow the
  * redirect an expired session throws, which is what previously stranded users
  * on an error with no way to sign in again.
+ *
+ * A refusal is the only thing it absorbs. This used to catch everything, so a
+ * slow or unreachable Odoo produced the same null a permission boundary does —
+ * every list rendered empty, every record page 404'd, and nothing was logged
+ * to say otherwise. Transport failures now reach the error boundary, which is
+ * the one screen that offers a way to retry or sign in again.
  */
 export async function orNullOnRefusal<T>(promise: Promise<T>): Promise<T | null> {
   try {
     return await promise
   } catch (cause) {
     unstable_rethrow(cause)
+    const error = toOdooError(cause)
+    if (!REFUSAL_CODES.has(error.code)) throw error
+    // Structured, and free of anything the record itself contained: a refusal
+    // is expected often enough that it must be greppable, not silent.
+    console.warn(JSON.stringify({ event: 'odoo.read.refused', code: error.code }))
     return null
   }
 }

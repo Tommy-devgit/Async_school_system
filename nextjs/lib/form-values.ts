@@ -62,3 +62,38 @@ export function submittedList<Field extends string>(
 
   return values
 }
+
+/**
+ * A relational id as Odoo wants it: a positive integer, or `false` to clear.
+ *
+ * The four call sites this replaces each wrote `raw ? Number(raw) : false`,
+ * which turns any non-numeric value into `NaN`. `NaN` has no JSON form, so it
+ * serialises to `null`, and Odoo reads `null` as false — the write then
+ * silently clears the relation instead of being refused. A `<select>` never
+ * posts anything but a valid id, so this only bites a submission the browser
+ * did not build; it should still be refused rather than obeyed.
+ *
+ * Returns `null` for a value that is neither a usable id nor a deliberate
+ * clear, which the caller reports as a field error.
+ */
+export function relationalId(raw: string): number | false | null {
+  if (!raw) return false
+  const parsed = Number(raw)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+/**
+ * Whether a value is shaped like an email address.
+ *
+ * Deliberately the same shape check the browser applies to `type="email"`, and
+ * nothing more: an address is only really validated by sending to it, and a
+ * stricter pattern rejects real addresses. Its job is to stop a submission the
+ * browser did not build from reaching Odoo, which stores staff email as a plain
+ * Char with no constraint of its own and then hands it to `res.users.login`
+ * when a teaching login is provisioned.
+ *
+ * An empty value is not an error here — required-ness is the caller's call.
+ */
+export function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}

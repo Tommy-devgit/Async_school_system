@@ -57,7 +57,7 @@ const created = []
 async function landingFor(loginName, password) {
   const context = await browser.newContext()
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', loginName)
   await page.fill('#password', password)
   await page.click('#submit-login')
@@ -126,19 +126,19 @@ try {
   /* Signing in again while already signed in must not contradict the first. */
   const context = await browser.newContext()
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', bothLogin)
   await page.fill('#password', PROBE_PASSWORD)
   await page.click('#submit-login')
   await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 60_000 })
-  await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   const rootUrl = new URL(page.url())
   check('the root route agrees with the login redirect',
     rootUrl.pathname + rootUrl.search === '/assessments?status=submitted',
     rootUrl.pathname + rootUrl.search)
 
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   const bounced = new URL(page.url())
   check('an already signed-in visitor is bounced to the same place',
@@ -147,7 +147,7 @@ try {
 
   check('the dashboard stays reachable for a non-admin',
     (await (async () => {
-      await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
       await page.waitForTimeout(400)
       return new URL(page.url()).pathname
     })()) === '/dashboard')

@@ -63,7 +63,7 @@ try {
   const page = await context.newPage()
 
   console.log('\n[1] A dead Odoo session must not strand the user')
-  await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
   await page.waitForTimeout(2500)
   const body = (await page.textContent('body')) ?? ''
 

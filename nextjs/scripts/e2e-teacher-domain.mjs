@@ -75,7 +75,7 @@ const sid = await odooLogin(LOGIN)
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await context.newPage()
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -102,7 +102,7 @@ check('the teacher number is Odoo\'s sequence', meta.teacher_id?.readonly === tr
 /* ---------------------------------------------------------- eligibility --- */
 
 console.log('\nonly staff Odoo would accept are offered')
-await page.goto(`${BASE}/teachers/new`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/teachers/new`, { waitUntil: 'networkidle' })
 const offered = await page
   .locator('main select[name="staff_id"] option')
   .evaluateAll((nodes) => nodes.map((n) => n.value).filter(Boolean))
@@ -230,7 +230,7 @@ if (offered.length === 0) {
     /* ----------------------------------------------------------- edit --- */
 
     console.log('\nedit: Next.js -> Odoo')
-    await page.goto(`${BASE}/teachers/${teacher.id}/edit`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/teachers/${teacher.id}/edit`, { waitUntil: 'networkidle' })
     check('the staff link is not editable after creation',
       (await page.locator('main select[name="staff_id"]').count()) === 0)
     await page.fill('main input[name="specialization"]', 'Physics')
@@ -253,7 +253,7 @@ if (offered.length === 0) {
     const [beforePw] = await odoo(sid, 'school.teacher', 'read', [[teacher.id], ['user_id']])
     if (beforePw.user_id) {
       const probePassword = `Probe-${Date.now().toString().slice(-6)}!aA`
-      await page.goto(`${BASE}/teachers/${teacher.id}`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${BASE}/teachers/${teacher.id}`, { waitUntil: 'networkidle' })
       const reset = page.locator('main button:has-text("Reset password")')
       check('a password can be set from the profile', (await reset.count()) === 1,
         `mail servers configured: ${mailServers}`)
@@ -288,7 +288,7 @@ if (offered.length === 0) {
       }
 
       // And a weak password must be refused by the module's own policy.
-      await page.goto(`${BASE}/teachers/${teacher.id}`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${BASE}/teachers/${teacher.id}`, { waitUntil: 'networkidle' })
       if (await page.locator('main button:has-text("Reset password")').count()) {
         await page.locator('main button:has-text("Reset password")').click()
         await page.waitForTimeout(300)
@@ -305,7 +305,7 @@ if (offered.length === 0) {
     /* ---------------------------------------------------------- login --- */
 
     console.log('\nlogin provisioning is Odoo\'s')
-    await page.goto(`${BASE}/teachers/${teacher.id}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/teachers/${teacher.id}`, { waitUntil: 'networkidle' })
     const [withUser] = await odoo(sid, 'school.teacher', 'read', [[teacher.id], ['user_id']])
     if (withUser.user_id) {
       check('creating the profile also created the login', true, withUser.user_id[1])
@@ -338,13 +338,13 @@ if (offered.length === 0) {
 /* ------------------------------------------------------------ read paths --- */
 
 console.log('\nlist and navigation')
-await page.goto(`${BASE}/teachers`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/teachers`, { waitUntil: 'networkidle' })
 const rows = await page.locator('main tbody tr').count()
 check('the list renders', rows >= 0, `${rows} row(s)`)
 if (rows > 0) {
   const href = await page.locator('main tbody tr td a').first().getAttribute('href')
   check('rows link to the profile', /^\/teachers\/\d+$/.test(href ?? ''), String(href))
-  await page.goto(`${BASE}${href}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}${href}`, { waitUntil: 'networkidle' })
   const body = (await page.locator('main').innerText()) ?? ''
   check('the profile opens', !/could not be found/i.test(body))
   check('it links back to the staff record', (await page.locator('main a[href^="/staff/"]').count()) >= 1)
@@ -352,7 +352,7 @@ if (rows > 0) {
 
 console.log('\nbad input degrades safely')
 for (const url of ['/teachers/999999', '/teachers/abc']) {
-  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' })
+  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'networkidle' })
   const body = (await page.textContent('body')) ?? ''
   check(`${url.padEnd(18)} does not leak`, !/Traceback|odoo\.exceptions/i.test(body), `http=${response?.status()}`)
 }

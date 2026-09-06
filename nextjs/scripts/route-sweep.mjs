@@ -35,7 +35,7 @@ for (const [role, login] of Object.entries(ROLES)) {
   if (!login) continue
   const context = await browser.newContext()
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -43,7 +43,7 @@ for (const [role, login] of Object.entries(ROLES)) {
 
   console.log(`\n${role} (${login})`)
   for (const route of ROUTES) {
-    const response = await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' })
+    const response = await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' })
     const body = (await page.textContent('body')) ?? ''
     const rows = await page.locator('tbody tr').count()
     const status = response?.status() ?? 0

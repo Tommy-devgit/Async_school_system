@@ -81,7 +81,7 @@ function textWithout(text, allowed) {
 async function dashboardFor(login) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } })
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -93,7 +93,7 @@ async function dashboardFor(login) {
     happens to point this week.
   */
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
-  await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
 /*
   The dashboard streams: Next sends a skeleton immediately and swaps the real
   page in when Odoo answers. Landing on the URL is therefore not the same as
@@ -234,7 +234,7 @@ check('the teacher gets a scoped menu, not everything',
 // Anything offered must actually open for this role.
 let broken = []
 for (const href of navLinks.slice(0, 20)) {
-  const response = await first.page.goto(`${BASE}${href}`, { waitUntil: 'domcontentloaded' })
+  const response = await first.page.goto(`${BASE}${href}`, { waitUntil: 'networkidle' })
   const body = (await first.page.textContent('body')) ?? ''
   if ((response?.status() ?? 0) !== 200 || /Traceback|odoo\.exceptions/i.test(body)) {
     broken.push(`${href} (${response?.status()})`)

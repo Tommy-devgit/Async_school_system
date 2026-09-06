@@ -36,7 +36,7 @@ const PNG = Buffer.from(
 async function signIn(browser, login) {
   const context = await browser.newContext()
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -53,12 +53,31 @@ async function signIn(browser, login) {
 
 async function upload(page, field, filename) {
   const input = page.locator(`#${field}-file`)
+  // Waits rather than asks. The detail page streams behind a loading boundary,
+  // so at the moment a redirect settles the upload form is not in the DOM yet;
+  // isVisible() would answer "no" about a control that arrives a tick later.
+  await input.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
   if (!(await input.isVisible().catch(() => false))) return false
   await input.setInputFiles({ name: filename, mimeType: 'image/png', buffer: PNG })
   await page.locator(`form:has(#${field}-file) button[type=submit]`).click()
   await page.waitForTimeout(7000)
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.reload({ waitUntil: 'networkidle' })
+  await settled(page)
   return true
+}
+
+/**
+ * Wait for a streamed route to finish arriving.
+ *
+ * `networkidle` is not enough after a server action redirects: the load state
+ * has already been reached, so it returns at once while the loading boundary
+ * is still on screen. What actually marks the end is the skeleton going away
+ * and the page's own heading taking its place.
+ */
+async function settled(page) {
+  await page.locator('[role="status"]').first().waitFor({ state: 'detached', timeout: 20000 })
+    .catch(() => {})
+  await page.locator('main h1').first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => {})
 }
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
@@ -68,7 +87,7 @@ try {
   console.log('\n[1] Registration (registrar)')
   const { context: regCtx, page } = await signIn(browser, REGISTRAR)
 
-  await page.goto(`${BASE}/students/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/students/new`, { waitUntil: 'networkidle' })
   check('registration form opens', await page.locator('#name').isVisible())
 
   const faydaVisible = await page.locator('#fan_number').isVisible().catch(() => false)
@@ -108,6 +127,7 @@ try {
 
   /* ========================================================= documents === */
   console.log('\n[2] Documents (Browser → Next.js → Odoo)')
+  await settled(page)
   let body = (await page.textContent('body')) ?? ''
   check('starts in Draft', /draft/i.test(body))
   check('no student ID before approval', /No student ID yet/i.test(body))
@@ -141,7 +161,7 @@ try {
     await page.waitForTimeout(1200)
     await page.locator('button:has-text("Confirm approve")').click()
     await page.waitForTimeout(9000)
-    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.reload({ waitUntil: 'networkidle' })
     const approved = (await page.textContent('body')) ?? ''
     check('approval mints the student number', /STU-\d+/.test(approved), (approved.match(/STU-\d+/) ?? [''])[0])
     check('approval mints the admission number', /ADM-\d+/.test(approved), (approved.match(/ADM-\d+/) ?? [''])[0])
@@ -150,49 +170,62 @@ try {
     check('lifecycle moves to active', /\bactive\b/i.test(approved))
   } else {
     console.log('    (approval not attempted — Odoo still reports missing requirements)')
+    }
+
+    /* ============================================== scope + field access === */
+    console.log('\n[4] Scope and field protection')
+    /*
+      The teacher-scope section needs a teacher login of its own. Without one it
+      stands down rather than crashing on an undefined credential, so a partial
+      credential set still reports everything it did manage to check.
+    */
+    if (!TEACHER) {
+      console.log('    SKIPPED — set E2E_TEACHER_LOGIN to check teacher scope')
+    } else {
+      const { context: teacherCtx, page: teacherPage } = await signIn(browser, TEACHER)
+    await teacherPage.goto(`${BASE}/students/${studentId}`, { waitUntil: 'networkidle' })
+    const teacherBody = (await teacherPage.textContent('body')) ?? ''
+    /*
+      Three acceptable outcomes, all of them Odoo refusing something:
+
+        404          the record rule hides the student entirely. This is the
+                     strongest answer — it does not even confirm the record
+                     exists — and is what the page now returns when `read`
+                     comes back empty.
+        permission   the read raised and the page explained it.
+        restricted   the record is visible but the personal-data fields are not.
+
+      What would fail is a teacher seeing another class's student in full.
+    */
+    const notFound = /could not be found/i.test(teacherBody)
+    const refused = /do not have permission|Not available to your role/i.test(teacherBody)
+    const restricted = /Restricted to your role/i.test(teacherBody)
+    check(
+      'teacher is scoped out of, or field-restricted on, this student',
+      notFound || refused || restricted,
+      notFound ? 'record hidden by the record rule (404)'
+        : refused ? 'read refused' : 'personal data restricted',
+    )
+    check('teacher page leaks no traceback', !/Traceback|usr\/lib\/python/i.test(teacherBody))
+    await teacherPage.goto(`${BASE}/students/new`, { waitUntil: 'networkidle' })
+    check(
+      'teacher cannot open the registration form',
+      /cannot register students/i.test((await teacherPage.textContent('body')) ?? ''),
+    )
+    await teacherCtx.close()
   }
-
-  /* ============================================== scope + field access === */
-  console.log('\n[4] Scope and field protection')
-  const { context: teacherCtx, page: teacherPage } = await signIn(browser, TEACHER)
-  await teacherPage.goto(`${BASE}/students/${studentId}`, { waitUntil: 'domcontentloaded' })
-  const teacherBody = (await teacherPage.textContent('body')) ?? ''
-  /*
-    Three acceptable outcomes, all of them Odoo refusing something:
-
-      404          the record rule hides the student entirely. This is the
-                   strongest answer — it does not even confirm the record
-                   exists — and is what the page now returns when `read`
-                   comes back empty.
-      permission   the read raised and the page explained it.
-      restricted   the record is visible but the personal-data fields are not.
-
-    What would fail is a teacher seeing another class's student in full.
-  */
-  const notFound = /could not be found/i.test(teacherBody)
-  const refused = /do not have permission|Not available to your role/i.test(teacherBody)
-  const restricted = /Restricted to your role/i.test(teacherBody)
-  check(
-    'teacher is scoped out of, or field-restricted on, this student',
-    notFound || refused || restricted,
-    notFound ? 'record hidden by the record rule (404)'
-      : refused ? 'read refused' : 'personal data restricted',
-  )
-  check('teacher page leaks no traceback', !/Traceback|usr\/lib\/python/i.test(teacherBody))
-  await teacherPage.goto(`${BASE}/students/new`, { waitUntil: 'domcontentloaded' })
-  check(
-    'teacher cannot open the registration form',
-    /cannot register students/i.test((await teacherPage.textContent('body')) ?? ''),
-  )
 
   /* ======================================================== enrolments === */
   console.log('\n[5] Enrolments')
-  await page.goto(`${BASE}/enrollments`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/enrollments`, { waitUntil: 'networkidle' })
   const rows = await page.locator('tbody tr').count()
   check('registrar sees the enrolment register', rows > 0, `${rows} row(s)`)
   if (rows > 0) {
     await page.locator('tbody tr td a').first().click()
     await page.waitForURL(/\/enrollments\/\d+$/, { timeout: 60_000 }).catch(() => {})
+    // waitForURL resolves on the address changing, which is before the route
+    // behind it has streamed in.
+    await settled(page)
     const detail = (await page.textContent('body')) ?? ''
     check('enrolment detail opens', /\/enrollments\/\d+$/.test(page.url()), page.url())
     check('placement history rendered', /Placement history/i.test(detail))
@@ -203,7 +236,6 @@ try {
 
   console.log(`\n    probe student #${studentId} (${NAME}) left on staging — Odoo forbids deleting students with history`)
 
-  await teacherCtx.close()
   await regCtx.close()
 } finally {
   await browser.close()

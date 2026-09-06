@@ -8,7 +8,7 @@ import { readOne } from '@/lib/odoo/client'
 import { toOdooError } from '@/lib/odoo/errors'
 // Aliased: this module already has its own `submitted` over the student
 // intake fields, which the shared helper should eventually replace.
-import { submitted as submittedFields } from '@/lib/form-values'
+import { isEmail, relationalId, submitted as submittedFields } from '@/lib/form-values'
 
 import { saveAnswer } from '@/lib/odoo/models/registration'
 import {
@@ -206,10 +206,7 @@ export async function registerStudentAction(
   }
 
   // Email format
-  if (
-    email &&
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-  ) {
+  if (email && !isEmail(email)) {
     fieldErrors.email =
       'Enter a valid email address.'
   }
@@ -324,7 +321,7 @@ export async function registerStudentAction(
   // -------------------------------------------------------
 
   const validateDocument = (
-    file: FormDataEntryValue,
+    file: FormDataEntryValue | null,
     field: string,
   ) => {
     if (
@@ -345,30 +342,15 @@ export async function registerStudentAction(
     }
   }
 
-  if (!birthCertificate) {
-    return {
-      error: 'Please upload a birth certificate.',
-      fieldErrors,
-      values: submittedFields(form, INTAKE_FIELDS),
-    }
-  }
-
   validateDocument(
     birthCertificate,
     'birth_certificate',
   )
 
-  // Previous grade document is optional for
-  // entry-level classes.
-  if (
-    previousGradeDocument instanceof File &&
-    previousGradeDocument.size > 0
-  ) {
-    validateDocument(
-      previousGradeDocument,
-      'previous_grade_document',
-    )
-  }
+  validateDocument(
+    previousGradeDocument,
+    'previous_grade_document',
+  )
 
   if (Object.keys(fieldErrors).length > 0) {
     return {
@@ -916,7 +898,7 @@ export async function updateStudentAction(
   }
 
   const email = text(form, 'email')
-  if (form.has('email') && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (form.has('email') && email && !isEmail(email)) {
     fieldErrors.email = 'Enter a valid email address.'
   }
 
@@ -1001,11 +983,16 @@ export async function saveAnswersAction(
     // not a hundred pointless writes.
     if (optionRaw === wasOption && textRaw === wasText) continue
 
+    const optionId = relationalId(optionRaw)
+    if (optionId === null) {
+      return { error: 'That answer could not be read.', values: submittedAnswers(form) }
+    }
+
     try {
       await saveAnswer(studentId, questionId, {
         id: Number.isInteger(existing) && existing > 0 ? existing : undefined,
         value_text: textRaw || false,
-        option_id: optionRaw ? Number(optionRaw) : false,
+        option_id: optionId,
       })
       saved += 1
     } catch (cause) {

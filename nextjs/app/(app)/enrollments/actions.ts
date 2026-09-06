@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation' 
 import { requireSession } from '@/lib/odoo/auth' 
 import { toOdooError } from '@/lib/odoo/errors'
-import { submitted } from '@/lib/form-values' 
+import { relationalId, submitted } from '@/lib/form-values' 
 import {
   authorizeOverride,
   createEnrollment,
@@ -38,8 +38,10 @@ export async function createEnrollmentAction(
   }
 
   const fieldErrors: Record<string, string> = {}
-  if (!raw.student_id) fieldErrors.student_id = 'Pick a student from the list.'
-  if (!raw.class_id) fieldErrors.class_id = 'Choose a grade / class.'
+  const studentId = relationalId(raw.student_id)
+  const classId = relationalId(raw.class_id)
+  if (!raw.student_id || studentId === null) fieldErrors.student_id = 'Pick a student from the list.'
+  if (!raw.class_id || classId === null) fieldErrors.class_id = 'Choose a grade / class.'
   if (!raw.admission_type) fieldErrors.admission_type = 'Choose an admission type.'
   if (!raw.enrollment_date) fieldErrors.enrollment_date = 'Enter an enrollment date.'
 
@@ -50,8 +52,10 @@ export async function createEnrollmentAction(
   let enrollmentId: number
   try {
     enrollmentId = await createEnrollment({
-      student_id: Number(raw.student_id),
-      class_id: Number(raw.class_id),
+      // Both non-null past the fieldErrors return above, which the compiler
+      // cannot see through.
+      student_id: studentId as number,
+      class_id: classId as number,
       admission_type: raw.admission_type,
       enrollment_date: raw.enrollment_date,
     })

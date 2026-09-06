@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { FilterSelect, SearchField, type FilterSpec } from '@/components/list-toolbar'
 import {
@@ -117,6 +118,15 @@ export async function ResourceList<T extends { id: number }>({
       </>
     )
   }
+
+  // A page past the end renders as an empty list whose pagination control has
+  // itself disappeared — Pagination hides when there is one page or fewer — so
+  // the reader is told "nothing matches" about filters they never set, with no
+  // offered way back. Sending them to the last real page is the honest answer:
+  // it happens when a bookmark outlives the rows, or when records are removed
+  // while someone is deep in the list.
+  const lastPage = Math.max(1, Math.ceil(result.total / query.limit))
+  if (query.page > lastPage && result.total > 0) redirect(hrefs.forPage(lastPage))
 
   const hasToolbar = Boolean(search) || filters.length > 0
 

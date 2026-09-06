@@ -8,8 +8,12 @@
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
-                <field name="start_date"/>
-                <field name="end_date"/>
+                <!-- date_start/date_end are the required, CHECK-constrained pair the
+                     rest of the module reads. This list used to show start_date and
+                     end_date, which nothing consumes, so adding a term here always
+                     failed on a required field the form never rendered. -->
+                <field name="date_start"/>
+                <field name="date_end"/>
                 <field name="active" optional="hide"/>
             </list>
         </field>

@@ -90,7 +90,7 @@ const attach = async () =>
   })
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -99,7 +99,7 @@ try {
   /* --------------------------------------------------- the way in exists --- */
 
   console.log('\nthe documents screen offers a way to file one')
-  await page.goto(`${BASE}/documents`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/documents`, { waitUntil: 'networkidle' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
   check('the list offers "File a document"', (await page.locator('a[href="/documents/new"]').count()) > 0)
 
@@ -110,7 +110,7 @@ try {
     refusal here is the case that could strand one.
   */
   console.log('\na refused upload leaves no attachment behind')
-  await page.goto(`${BASE}/documents/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/documents/new`, { waitUntil: 'networkidle' })
   await page.locator('#name').waitFor({ timeout: 30_000 })
 
   const attachmentsBefore = await odoo(sid, 'ir.attachment', 'search_count', [
@@ -177,13 +177,13 @@ try {
     console.log('\na role that cannot file one is offered no way to')
     const readerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
     const reader = await readerContext.newPage()
-    await reader.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+    await reader.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
     await reader.fill('#login', TEACHER)
     await reader.fill('#password', PASSWORD)
     await reader.click('#submit-login')
     await reader.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
-    await reader.goto(`${BASE}/documents/new`, { waitUntil: 'domcontentloaded' })
+    await reader.goto(`${BASE}/documents/new`, { waitUntil: 'networkidle' })
     await reader.locator('main').first().waitFor({ timeout: 30_000 })
     const denied = (await reader.locator('main').textContent()) ?? ''
     check('the direct URL is refused in words', /cannot file|not permitted|role/i.test(denied))

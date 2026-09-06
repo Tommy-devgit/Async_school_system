@@ -43,7 +43,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 const cleanup = []
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -53,7 +53,7 @@ try {
   /* ==================================================== questionnaire === */
   const QUESTION = `Verify question ${STAMP}`
   const CODE = `vq${STAMP}`
-  await page.goto(`${BASE}/configuration/questionnaire/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/configuration/questionnaire/new`, { waitUntil: 'networkidle' })
   await page.fill('#name', QUESTION)
   await page.fill('#code', CODE)
   await page.selectOption('#answer_type', 'selection')
@@ -79,7 +79,7 @@ try {
   check('answer type written', made[0]?.answer_type === 'selection', String(made[0]?.answer_type))
 
   // Odoo's unique-code constraint must surface.
-  await page.goto(`${BASE}/configuration/questionnaire/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/configuration/questionnaire/new`, { waitUntil: 'networkidle' })
   await page.fill('#name', `${QUESTION} dup`)
   await page.fill('#code', CODE)
   await page.locator('form:has(#name) button[type=submit]').click()
@@ -94,7 +94,7 @@ try {
   if (strays.length) await call('school.registration.question', 'unlink', [strays])
 
   // A selection question needs choices; add one through the page.
-  await page.goto(`${BASE}/configuration/questionnaire/${questionId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/configuration/questionnaire/${questionId}`, { waitUntil: 'networkidle' })
   const optionForm = page.locator('form:has(input[name=value])')
   await optionForm.locator('input[name=name]').fill('Yes, always')
   await optionForm.locator('input[name=value]').fill('always')
@@ -138,7 +138,7 @@ try {
     check('an unanswered required question blocks submission',
       refusal.includes(QUESTION), refusal.slice(0, 110) || 'submission was allowed')
 
-    await page.goto(`${BASE}/students/${studentId}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/students/${studentId}`, { waitUntil: 'networkidle' })
     const shown = await page.locator('body').innerText()
     check('the student page asks the question', shown.includes(QUESTION))
 
@@ -172,7 +172,7 @@ try {
   const [docType] = await call('school.document.type', 'search_read', [[], ['name']], { limit: 1 })
   check('a document type exists to build a rule from', Boolean(docType))
   if (docType) {
-    await page.goto(`${BASE}/configuration/document-rules`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/configuration/document-rules`, { waitUntil: 'networkidle' })
     const before = await call('school.document.rule', 'search_count', [[]])
     await page.selectOption('select[name=document_type_id]', String(docType.id))
     await page.locator('form:has(select[name=document_type_id]) button[type=submit]').click()
@@ -193,7 +193,7 @@ try {
     [[['state', '=', 'active']]], { limit: 1 })
   check('an active enrolment exists to transfer', Boolean(enrollmentId))
   if (enrollmentId) {
-    await page.goto(`${BASE}/enrollments/${enrollmentId}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/enrollments/${enrollmentId}`, { waitUntil: 'networkidle' })
     const body = await page.locator('body').innerText()
     check('the transfer control is offered on an active enrolment',
       /Transfer to another class/.test(body))
@@ -214,7 +214,7 @@ try {
   ]
   const overflowing = []
   for (const route of routes) {
-    await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth)

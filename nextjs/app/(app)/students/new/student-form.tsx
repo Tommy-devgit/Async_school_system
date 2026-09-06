@@ -368,8 +368,8 @@ export function StudentRegistrationForm({
             {chosen.name} sits in {chosen.year}
             {chosen.level ? ` · ${formatSelection(chosen.level)}` : ''}
             {chosen.entryLevel
-              ? ' · entry level, so no previous-grade document is required'
-              : ' · a previous-grade document is required before submission'}
+              ? ' · entry level, so no previous-grade document is needed'
+              : ' · a previous-grade document is needed before submission'}
             .
           </p>
         ) : null}
@@ -540,18 +540,16 @@ export function StudentRegistrationForm({
         <FileField
           label="Birth certificate"
           htmlFor="birth_certificate"
-          required
           error={err.birth_certificate}
-          hint="PDF or PNG."
+          hint="PDF or PNG. Can be attached later, before submission."
         />
 
         {!chosen?.entryLevel ? (
           <FileField
             label="Previous-grade document"
             htmlFor="previous_grade_document"
-            required
             error={err.previous_grade_document}
-            hint="PDF or PNG. Required for grades that are not entry level."
+            hint="PDF or PNG. Can be attached later, before submission."
           />
         ) : null}
       </Section>

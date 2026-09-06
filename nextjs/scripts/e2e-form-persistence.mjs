@@ -42,13 +42,13 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
 await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
-await page.goto(`${BASE}/teachers/new`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/teachers/new`, { waitUntil: 'networkidle' })
 await page.locator('select[name="staff_id"]').waitFor({ timeout: 30_000 })
 
 /* --------------------------------------------------- fill the whole form --- */
@@ -147,7 +147,7 @@ check(
 console.log('\na refused sign-in keeps the email address')
 const anon = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const anonPage = await anon.newPage()
-await anonPage.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await anonPage.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await anonPage.fill('#login', LOGIN)
 await anonPage.fill('#password', 'definitely-not-the-password')
 await anonPage.click('#submit-login')
@@ -187,7 +187,7 @@ await anon.close()
 const STAFF_ID = process.env.E2E_STAFF_ID
 if (STAFF_ID) {
   console.log('\na refused responsibility keeps what was chosen')
-  await page.goto(`${BASE}/staff/${STAFF_ID}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/staff/${STAFF_ID}`, { waitUntil: 'networkidle' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 
   const addButton = page.locator('button:has-text("Add responsibility")')
@@ -256,7 +256,7 @@ if (STAFF_ID) {
   had to land on the right one.
 */
 console.log('\na refused term keeps every field it was given')
-await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'networkidle' })
 await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 
 const addTerm = page.locator('form:has(#new-name)')

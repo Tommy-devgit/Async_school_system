@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node scripts/run-unit-tests.mjs",
+    "e2e": "node scripts/e2e-all.mjs"
   },
   "dependencies": {
     "jose": "^6.2.10",

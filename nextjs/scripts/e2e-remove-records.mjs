@@ -112,7 +112,7 @@ const existsIncludingArchived = async (model, id) =>
   (await odoo(sid, model, 'search_count', [[['id', '=', id]]], { context: { active_test: false } })) === 1
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -124,7 +124,7 @@ try {
 
   const openProbes = async () => {
     await page.goto(`${BASE}/programs?q=${encodeURIComponent(`ZZZ remove probe ${STAMP}`)}`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle',
     })
     await page.locator('main h1').first().waitFor({ timeout: 30_000 })
   }
@@ -221,7 +221,7 @@ try {
     const staffName = referenced[0].staff_id[1]
 
     await page.goto(`${BASE}/staff?q=${encodeURIComponent(staffName)}`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle',
     })
     await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 
@@ -299,7 +299,7 @@ try {
     Archive, and it has to say Archive rather than Delete.
   */
   console.log('\nwhere Odoo allows no delete, the screen offers archive instead')
-  await page.goto(`${BASE}/students`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/students`, { waitUntil: 'networkidle' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
   const studentBoxes = page.locator('main tbody input[name="id"]')
   const studentCount = await studentBoxes.count()
@@ -339,7 +339,7 @@ try {
     console.log('\na role Odoo would refuse is offered no selection at all')
     const readerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
     const reader = await readerContext.newPage()
-    await reader.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+    await reader.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
     await reader.fill('#login', TEACHER)
     await reader.fill('#password', PASSWORD)
     await reader.click('#submit-login')
@@ -351,7 +351,7 @@ try {
       would pass without proving anything. A teacher does see classes, and only
       the administrator may unlink one.
     */
-    await reader.goto(`${BASE}/classes`, { waitUntil: 'domcontentloaded' })
+    await reader.goto(`${BASE}/classes`, { waitUntil: 'networkidle' })
     await reader.locator('main h1').first().waitFor({ timeout: 30_000 })
     const readerText = (await reader.locator('main').textContent()) ?? ''
 
@@ -367,7 +367,7 @@ try {
       holds unlink on school.class.
     */
     console.log('\nthe gate is per model, not per role')
-    await page.goto(`${BASE}/classes`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/classes`, { waitUntil: 'networkidle' })
     await page.locator('main h1').first().waitFor({ timeout: 30_000 })
     check('the registrar sees classes', (await page.locator('main tbody tr').count()) > 0)
     check(

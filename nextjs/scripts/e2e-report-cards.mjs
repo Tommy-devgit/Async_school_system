@@ -83,7 +83,7 @@ check('draft, approved and published all exist',
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -97,7 +97,7 @@ await page.click('#submit-login')
 await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
 console.log('\ngeneration is offered, because nothing else creates a report card')
-await page.goto(`${BASE}/report-cards`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/report-cards`, { waitUntil: 'networkidle' })
 const generator = page.locator('main form:has-text("Generate")')
 check('the generator is on the page', (await generator.count()) >= 1)
 check('it asks for a term', (await page.locator('main select[name="termId"]').count()) === 1)
@@ -116,7 +116,7 @@ if (drafts.length === 0) {
   console.log('  SKIP  no draft report card in this database to approve')
 } else {
   const card = drafts[0]
-  await page.goto(`${BASE}/report-cards/${card.id}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/report-cards/${card.id}`, { waitUntil: 'networkidle' })
   const approve = page.locator('main button:has-text("Approve")')
   check('Approve is offered on a draft card', (await approve.count()) >= 1, card.name)
 
@@ -152,7 +152,7 @@ if (process.env.E2E_ALLOW_WRITES === 'yes') {
   console.log('\nOdoo → Next.js → Odoo: generating for a class')
   const before = await odoo(sid, 'school.report.card', 'search_count', [[]])
 
-  await page.goto(`${BASE}/report-cards`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/report-cards`, { waitUntil: 'networkidle' })
   const terms = await page.locator('main select[name="termId"] option').evaluateAll((nodes) =>
     nodes.map((n) => n.value).filter(Boolean),
   )
@@ -195,7 +195,7 @@ if (process.env.E2E_ALLOW_WRITES === 'yes') {
 /* ----------------------------------------- the old bug cannot come back --- */
 
 console.log('\nregression guards')
-await page.goto(`${BASE}/report-cards`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/report-cards`, { waitUntil: 'networkidle' })
 const listText = (await page.locator('main').innerText()) ?? ''
 check('the list does not offer a dead "Generate" transition', !/Generate report card v/i.test(listText))
 
@@ -205,7 +205,7 @@ const published = await odoo(sid, 'school.report.card', 'search_read', [], {
   limit: 1,
 })
 if (published.length) {
-  await page.goto(`${BASE}/report-cards/${published[0].id}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/report-cards/${published[0].id}`, { waitUntil: 'networkidle' })
   const text = (await page.locator('main').innerText()) ?? ''
   check('a published card offers no further transition', /No status changes are available/i.test(text))
   check('and still renders its subject lines', /Subject results/i.test(text))

@@ -80,7 +80,7 @@ const surname = `Probe${stamp}`
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await context.newPage()
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -96,7 +96,7 @@ await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90
 /* ------------------------------------------------------------ create --- */
 
 console.log('\ncreate: Next.js -> Odoo')
-await page.goto(`${BASE}/staff/new`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/staff/new`, { waitUntil: 'networkidle' })
 
 const pick = async (name, index = 1) => {
   const values = await page
@@ -154,7 +154,7 @@ check('registration seeded one, marked primary',
   responsibilities.length === 1 && responsibilities[0].is_primary,
   JSON.stringify(responsibilities.map((r) => r.responsibility)))
 
-await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
 check('the record page lists responsibilities',
   (await page.locator('main h2:text-is("Responsibilities")').count()) === 1)
 check('and offers to add one', (await page.locator('main button:has-text("Add responsibility")').count()) === 1)
@@ -179,7 +179,7 @@ check('still exactly one primary', afterAdd.filter((r) => r.is_primary).length =
 // not the frontend quietly avoiding the situation.
 const nonPrimary = afterAdd.find((r) => !r.is_primary)
 if (nonPrimary) {
-  await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
   await page.locator('main button:has-text("Make primary")').first().click()
   await page.waitForTimeout(2500)
   const afterPrimary = await odoo(sid, 'school.staff.responsibility', 'search_read', [], {
@@ -191,7 +191,7 @@ if (nonPrimary) {
     `${afterPrimary.filter((r) => r.is_primary).length} primary`)
 }
 
-await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
 const endButtons = await page.locator('main button:has-text("End")').count()
 if (endButtons > 1) {
   await page.locator('main button:has-text("End")').last().click()
@@ -209,7 +209,7 @@ if (endButtons > 1) {
 /* -------------------------------------------------------------- edit --- */
 
 console.log('\nedit: Next.js -> Odoo')
-await page.goto(`${BASE}/staff/${staffId}/edit`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/staff/${staffId}/edit`, { waitUntil: 'networkidle' })
 check('the edit form loads', (await page.locator('main form').count()) >= 1)
 check('the staff number is shown but not editable',
   (await page.locator('main input[name="staff_id"]').count()) === 0)
@@ -227,7 +227,7 @@ check('Odoo stored the edit', edited.mobile === newMobile, `${edited.mobile}`)
 /* --------------------------------------------------- Odoo says no ------ */
 
 console.log('\nOdoo refusals reach the user')
-await page.goto(`${BASE}/staff/${staffId}/edit`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/staff/${staffId}/edit`, { waitUntil: 'networkidle' })
 if (await page.locator('main input[name="fayda_id"]').count()) {
   await page.fill('main input[name="fayda_id"]', '123')
   await page.click('main form button[type="submit"]')
@@ -244,7 +244,7 @@ if (await page.locator('main input[name="fayda_id"]').count()) {
 /* ---------------------------------------------------------- activate --- */
 
 console.log('\nactivation: the gate Odoo enforces')
-await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
 const before = await odoo(sid, 'school.staff', 'read', [[staffId], ['state']])
 check('still draft before activating', before[0].state === 'draft', before[0].state)
 
@@ -271,7 +271,7 @@ if (await activate.count()) {
 /* ------------------------------------------------------ authorization --- */
 
 console.log('\nauthorization')
-await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
 const body = (await page.locator('main').innerText()) ?? ''
 check('no raw Odoo internals on the page', !/Traceback|odoo\.exceptions|psycopg2/i.test(body))
 check('delete is never offered — Odoo reserves it for an administrator',

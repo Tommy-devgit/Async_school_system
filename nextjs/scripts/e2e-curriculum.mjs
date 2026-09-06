@@ -39,7 +39,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 async function signIn(login) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -62,7 +62,7 @@ async function columnOffset(page) {
 
 console.log('\nthe curriculum lists')
 const { context: registrarContext, page } = await signIn(REGISTRAR)
-await page.goto(`${BASE}/curriculum`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/curriculum`, { waitUntil: 'networkidle' })
 await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 
 const heading = (await page.locator('main h1').first().textContent()) ?? ''
@@ -91,7 +91,7 @@ const needle = subjectCell.trim().split(/\s+/)[0]
 check('a subject name was read off the first row', Boolean(needle), needle)
 
 await page.goto(`${BASE}/curriculum?q=${encodeURIComponent(needle)}`, {
-  waitUntil: 'domcontentloaded',
+  waitUntil: 'networkidle',
 })
 await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 const narrowed = await bodyRows(page).count()
@@ -102,7 +102,7 @@ const shown = await text()
 check('every row still mentions the term', shown.toLowerCase().includes(needle.toLowerCase()))
 
 console.log('\nfiltering by class narrows to that class only')
-await page.goto(`${BASE}/curriculum`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/curriculum`, { waitUntil: 'networkidle' })
 await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 
 // Read the class off the first row, then find the filter option that names it,
@@ -120,7 +120,7 @@ const classId =
     : null
 
 if (classId) {
-  await page.goto(`${BASE}/curriculum?class=${classId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/curriculum?class=${classId}`, { waitUntil: 'networkidle' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
   const classes = await bodyRows(page)
     .locator(`td:nth-child(${1 + (await columnOffset(page))})`)
@@ -137,7 +137,7 @@ if (classId) {
 }
 
 console.log('\na search that matches nothing is empty, not broken')
-await page.goto(`${BASE}/curriculum?q=zzz-no-such-subject-zzz`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/curriculum?q=zzz-no-such-subject-zzz`, { waitUntil: 'networkidle' })
 await page.locator('main').waitFor({ timeout: 30_000 })
 const nothing = await text()
 check('no rows', (await bodyRows(page).count()) === 0)
@@ -158,7 +158,7 @@ for (const query of [
   '?sort=subject_id:sideways',
   '?active=maybe',
 ]) {
-  const response = await page.goto(`${BASE}/curriculum${query}`, { waitUntil: 'domcontentloaded' })
+  const response = await page.goto(`${BASE}/curriculum${query}`, { waitUntil: 'networkidle' })
   const body = await text()
   check(
     `${query.padEnd(24)} renders`,
@@ -174,7 +174,7 @@ console.log('\nsorting is offered on the columns that can carry it')
 // The list shell reads the sort as one `field:direction` parameter.
 const column = async (field, direction, nth) => {
   await page.goto(`${BASE}/curriculum?sort=${field}:${direction}`, {
-    waitUntil: 'domcontentloaded',
+    waitUntil: 'networkidle',
   })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
   const cells = await bodyRows(page)
@@ -215,13 +215,13 @@ for (const [field, nth] of [
 /* ------------------------------------------- the edit link follows write --- */
 
 console.log('\nthe edit form is offered to a role that can save it')
-await page.goto(`${BASE}/curriculum`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/curriculum`, { waitUntil: 'networkidle' })
 await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 const editLinks = await page.locator('main table tbody a[href*="/curriculum/"]').count()
 check('the registrar gets links into the edit form', editLinks > 0, `${editLinks} link(s)`)
 
 const href = await page.locator('main table tbody a[href*="/curriculum/"]').first().getAttribute('href')
-await page.goto(`${BASE}${href}`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}${href}`, { waitUntil: 'networkidle' })
 await page.locator('main h1').first().waitFor({ timeout: 30_000 })
 const form = await text()
 check('the link opens the edit form', /maximum|pass mark/i.test(form), href ?? '')
@@ -233,7 +233,7 @@ await registrarContext.close()
 if (TEACHER) {
   console.log('\na read-only role sees the list and is offered no way to edit')
   const { context: readerContext, page: reader } = await signIn(TEACHER)
-  await reader.goto(`${BASE}/curriculum`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/curriculum`, { waitUntil: 'networkidle' })
   await reader.locator('main h1').first().waitFor({ timeout: 30_000 })
   const readerText = (await reader.locator('main').textContent()) ?? ''
 
@@ -259,7 +259,7 @@ if (TEACHER) {
 if (HR) {
   console.log('\na role with no ACL row on school.grade.subject is not offered it')
   const { context: hrContext, page: hrPage } = await signIn(HR)
-  await hrPage.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await hrPage.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
   await hrPage.locator('main').first().waitFor({ timeout: 30_000 })
   check(
     'Curriculum is absent from the sidebar',
@@ -267,7 +267,7 @@ if (HR) {
   )
 
   // And going there directly is refused in words, not with a stack trace.
-  await hrPage.goto(`${BASE}/curriculum`, { waitUntil: 'domcontentloaded' })
+  await hrPage.goto(`${BASE}/curriculum`, { waitUntil: 'networkidle' })
   await hrPage.locator('main').first().waitFor({ timeout: 30_000 })
   const hrText = (await hrPage.locator('main').textContent()) ?? ''
   check('the direct URL does not leak a traceback', !/Traceback|psycopg2/i.test(hrText))

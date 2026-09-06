@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+import { relationalId } from '@/lib/form-values'
 import {
   applyAssignmentTransition,
   createAssignment,
@@ -112,8 +113,11 @@ export async function updateAssignmentAction(
     if (!form.has(field)) continue
     const raw = text(form, field)
     if (field === 'weekly_periods') values[field] = Number(raw || '1')
-    else if (field.endsWith('_id')) values[field] = raw ? Number(raw) : false
-    else values[field] = raw || false
+    else if (field.endsWith('_id')) {
+      const id = relationalId(raw)
+      if (id === null) return { fieldErrors: { [field]: 'Choose a valid option.' }, values: submitted(form) }
+      values[field] = id
+    } else values[field] = raw || false
   }
 
   try {
