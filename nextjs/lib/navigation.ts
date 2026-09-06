@@ -254,6 +254,16 @@ const NAV_RULES: NavRuleSection[] = [
         visible: (r) => any(r.isRegistrar, r.isAdmin, r.isTeacher, r.isExamOfficer),
       },
       {
+        href: '/curriculum',
+        label: 'Curriculum',
+        icon: 'subjects',
+        description: 'What each class studies, and what it is marked out of',
+        // Every role with an ACL row on school.grade.subject: the administrator
+        // and registrar can write, the director, teacher and exam officer read.
+        visible: (r) =>
+          any(r.isAdmin, r.isRegistrar, r.isDirector, r.isTeacher, r.isExamOfficer),
+      },
+      {
         href: '/academic-years',
         label: 'Academic years',
         icon: 'academicYear',

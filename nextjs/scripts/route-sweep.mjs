@@ -20,7 +20,7 @@ const ROUTES = [
   '/enrollments',
   '/staff', '/staff/new',
   '/teachers',
-  '/academic-years', '/classes', '/subjects', '/configuration',
+  '/academic-years', '/classes', '/subjects', '/curriculum', '/configuration',
   '/assignments', '/schedule', '/attendance',
   '/assessments', '/marks', '/report-cards', '/promotion',
   '/announcements', '/programs', '/documents',
