@@ -324,7 +324,7 @@ export async function registerStudentAction(
   // -------------------------------------------------------
 
   const validateDocument = (
-    file: FormDataEntryValue,
+    file: FormDataEntryValue | null,
     field: string,
   ) => {
     if (
@@ -345,30 +345,15 @@ export async function registerStudentAction(
     }
   }
 
-  if (!birthCertificate) {
-    return {
-      error: 'Please upload a birth certificate.',
-      fieldErrors,
-      values: submittedFields(form, INTAKE_FIELDS),
-    }
-  }
-
   validateDocument(
     birthCertificate,
     'birth_certificate',
   )
 
-  // Previous grade document is optional for
-  // entry-level classes.
-  if (
-    previousGradeDocument instanceof File &&
-    previousGradeDocument.size > 0
-  ) {
-    validateDocument(
-      previousGradeDocument,
-      'previous_grade_document',
-    )
-  }
+  validateDocument(
+    previousGradeDocument,
+    'previous_grade_document',
+  )
 
   if (Object.keys(fieldErrors).length > 0) {
     return {
