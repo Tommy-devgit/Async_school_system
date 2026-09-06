@@ -89,6 +89,79 @@ class SchoolPromotionBatch(models.Model):
             if rec.target_academic_year_id.date_start < rec.academic_year_id.date_end:
                 raise ValidationError("Target Academic Year must start after the current Academic Year.")
 
+    def _covered_class_ids(self):
+        """The classes this batch will actually promote.
+
+        An empty `class_ids` is not "no classes" — `action_calculate_outcomes`
+        reads it as every class of the grade in that year, so that is what the
+        batch covers.
+        """
+        self.ensure_one()
+        if self.class_ids:
+            return set(self.class_ids.ids)
+        return set(self.env['school.class'].search([
+            ('academic_year_id', '=', self.academic_year_id.id),
+            ('grade_id', '=', self.grade_id.id),
+        ]).ids)
+
+    @api.constrains('class_ids', 'academic_year_id', 'grade_id')
+    def _check_classes_in_scope(self):
+        """`class_ids` carries this domain in the view; nothing enforced it.
+
+        A class from another grade or year would silently widen the batch,
+        because calculate trusts `class_ids` over its own grade and year.
+        """
+        for rec in self.filtered('class_ids'):
+            stray = rec.class_ids.filtered(
+                lambda item: item.academic_year_id != rec.academic_year_id
+                or item.grade_id != rec.grade_id
+            )
+            if stray:
+                raise ValidationError(
+                    "These classes do not belong to %s in %s: %s"
+                    % (rec.grade_id.name, rec.academic_year_id.name,
+                       ', '.join(stray.mapped('display_name')))
+                )
+
+    @api.constrains('academic_year_id', 'grade_id', 'class_ids', 'state')
+    def _check_no_overlapping_batch(self):
+        """One unapplied batch per set of students.
+
+        Two batches over the same students would advance them twice: the
+        second finds the enrolment the first opened and moves it again. The
+        rule is deliberately about *overlap* rather than equality, because a
+        school may legitimately promote 7A and 7B as separate batches — those
+        do not overlap — while a batch naming no classes covers the whole grade
+        and therefore overlaps everything.
+
+        Applied batches are excluded. Once a batch is `done` its students have
+        moved, and a later corrective batch for the same grade and year is a
+        legitimate thing to want. That is also why this is a Python constraint
+        rather than a SQL unique index: neither "not done" nor "overlapping
+        sets" can be expressed as one, and a unique index on (year, grade)
+        would forbid both of those legitimate cases.
+        """
+        for rec in self.filtered(lambda item: item.state != 'done'):
+            if not (rec.academic_year_id and rec.grade_id):
+                continue
+            others = self.search([
+                ('id', '!=', rec.id),
+                ('academic_year_id', '=', rec.academic_year_id.id),
+                ('grade_id', '=', rec.grade_id.id),
+                ('state', '!=', 'done'),
+            ])
+            if not others:
+                continue
+            covered = rec._covered_class_ids()
+            for other in others:
+                if covered & other._covered_class_ids():
+                    raise ValidationError(
+                        "%s already covers these students and has not been applied. "
+                        "Finish or delete it before starting another promotion for "
+                        "%s in %s — running both would advance the same students twice."
+                        % (other.name, rec.grade_id.name, rec.academic_year_id.name)
+                    )
+
     def _require_registrar_or_admin(self):
         if self.env.su:
             return
@@ -211,6 +284,27 @@ class SchoolPromotionBatch(models.Model):
             batch.state = 'approved'
 
     def action_apply_promotion(self):
+        """Advance every student in the batch into the next academic year.
+
+        This used to write the enrolment and the student itself, and got both
+        subtly wrong. `school.enrollment` already owns "a student's placement
+        changed" — `action_activate` creates the placement record, allocates a
+        roll number, derives the subject enrolments, checks the class capacity
+        and calls `_sync_student_class`, which is the one place that knows a
+        student's class, **section**, education level, stream and academic year
+        have to move together.
+
+        Promotion reimplemented a fragment of that: it created the enrolment
+        already `active` (so none of the above ran) and then hand-wrote the
+        student with only `class_id` and `academic_year_id`. Leaving the old
+        `section_id` in place made the student fail
+        `_check_registration_scope` — "The section must match the selected
+        Grade / Class" — for anybody whose new class sits in a different
+        section, which is most of a real promotion.
+
+        So it no longer writes the student at all. It creates the enrolment in
+        draft and activates it, and the enrolment carries the student across.
+        """
         self._require_registrar_or_admin()
         Enrollment = self.env['school.enrollment']
         for batch in self:
@@ -232,31 +326,47 @@ class SchoolPromotionBatch(models.Model):
                     })
 
                 if line.final_outcome in ('promoted', 'retained'):
+                    if not line.target_class_id:
+                        raise ValidationError(
+                            "%s has no target class, so they cannot be advanced. "
+                            "Recalculate the batch after creating the classes for "
+                            "%s." % (student.name, batch.target_academic_year_id.name)
+                        )
                     existing_target = Enrollment.search([
                         ('student_id', '=', student.id),
                         ('academic_year_id', '=', batch.target_academic_year_id.id),
                     ], limit=1)
-                    if not existing_target:
+                    if existing_target:
+                        # Already placed for next year — by an earlier partial
+                        # run, a transfer, or by hand. Move it onto the target
+                        # class rather than opening a second enrolment; the
+                        # write syncs the student the same way activation does.
+                        if existing_target.class_id != line.target_class_id:
+                            existing_target.write({'class_id': line.target_class_id.id})
+                        if existing_target.state == 'draft':
+                            existing_target.action_activate()
+                    else:
                         Enrollment.create({
                             'student_id': student.id,
                             'academic_year_id': batch.target_academic_year_id.id,
                             'class_id': line.target_class_id.id,
                             'enrollment_date': batch.target_academic_year_id.date_start,
-                            'state': 'active',
-                        })
-                    student.write({
-                        'class_id': line.target_class_id.id,
-                        'academic_year_id': batch.target_academic_year_id.id,
-                    })
+                        }).action_activate()
 
                 elif line.final_outcome == 'graduated':
-                    vals = {}
-                    if hasattr(student, 'lifecycle_status'):
-                        vals['lifecycle_status'] = 'graduated'
-                    if hasattr(student, 'registration_status'):
-                        vals['registration_status'] = 'approved'
-                    if vals:
-                        student.write(vals)
+                    # A graduating student keeps their approved registration and
+                    # gains a finished lifecycle. `registration_status` is one of
+                    # the fields `_check_required_fields_for_submission` watches,
+                    # so writing it re-runs the completeness check against a
+                    # record that was approved long ago — and fails for anyone
+                    # approved before a requirement was added. Approval itself is
+                    # unaffected: `action_mark_submitted` calls
+                    # `_validate_submission_requirements` directly and cannot be
+                    # skipped. This is the same context `_sync_student_class`
+                    # uses for exactly the same reason.
+                    student.with_context(skip_registration_completeness=True).write({
+                        'lifecycle_status': 'graduated',
+                    })
 
                 line.state = 'done'
 
