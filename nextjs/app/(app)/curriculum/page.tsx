@@ -1,6 +1,5 @@
 import { Badge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { formatSelection } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
 import { classOptions, subjectOptions } from '@/lib/odoo/filter-options'
@@ -66,6 +65,13 @@ export default async function CurriculumPage({ searchParams }: PageProps<'/curri
           offset: query.offset,
         })
       }
+      /*
+        Only a role that could save the form is given the link:
+        `school.grade.subject` grants write to the administrator and the
+        registrar, while the director, teacher and exam officer read it and are
+        shown the same list without a door into a form Odoo would refuse.
+      */
+      rowHref={canEdit ? (row) => `/curriculum/${row.id}/edit` : undefined}
       emptyTitle="No curriculum lines match"
       emptyHint="Curriculum lines are created for a whole class at once, on Configuration."
       columns={[
@@ -73,23 +79,7 @@ export default async function CurriculumPage({ searchParams }: PageProps<'/curri
           key: 'class',
           label: 'Class',
           sortField: 'class_id',
-          /*
-            The link is built here rather than handed to `rowHref`, which the
-            list shell accepts and then does nothing with — see /subjects and
-            /classes, whose rows do not currently go anywhere.
-
-            Only a role that could save the form is given the link:
-            `school.grade.subject` grants write to the administrator and the
-            registrar, while the director, teacher and exam officer read it and
-            are shown the same list without a door into a form Odoo would
-            refuse.
-          */
-          render: (row) =>
-            canEdit ? (
-              <RowLink href={`/curriculum/${row.id}/edit`}>{m2oLabel(row.class_id)}</RowLink>
-            ) : (
-              m2oLabel(row.class_id)
-            ),
+          render: (row) => m2oLabel(row.class_id),
         },
         {
           key: 'subject',

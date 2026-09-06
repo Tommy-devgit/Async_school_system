@@ -1,6 +1,5 @@
 import { LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { formatSelection, formatText } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
 import { hasAccess } from '@/lib/odoo/client'
@@ -60,7 +59,7 @@ export default async function StaffPage({ searchParams }: PageProps<'/staff'>) {
           key: 'name',
           label: 'Name',
           sortField: 'name',
-          render: (row) => <RowLink href={`/staff/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         {
           key: 'staffId',

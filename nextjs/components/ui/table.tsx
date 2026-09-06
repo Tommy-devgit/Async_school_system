@@ -132,7 +132,13 @@ export function Row({
   className,
 }: {
   children: ReactNode
-  /** Makes the whole row a target; the first cell still carries the link. */
+  /**
+   * Marks the row as navigable, which is all this does — it selects the hover
+   * affordance. The link itself is rendered into the first cell by
+   * `ResourceList`. Said plainly because the previous wording claimed this
+   * carried the link, and three list screens were built on that claim and had
+   * rows that went nowhere.
+   */
   href?: string
   className?: string
 }) {

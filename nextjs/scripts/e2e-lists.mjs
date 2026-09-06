@@ -184,6 +184,49 @@ for (const url of [
   )
 }
 
+/* ------------------------------------------ every list row goes somewhere --- */
+
+/*
+  A list whose rows are not clickable is not obviously broken — it renders, it
+  paginates, it sorts, and every existing check passes. /subjects and /classes
+  shipped that way, because `rowHref` was handed to `Row` and quietly dropped,
+  and only the screens that had *also* built a link by hand still worked.
+
+  So this asserts the thing no other check covered: if a list has rows, the
+  first cell of each row is a link to that record.
+*/
+console.log('\nevery list row links to its record')
+
+const LINKED_LISTS = [
+  '/students', '/staff', '/teachers', '/guardians', '/enrollments',
+  '/classes', '/subjects', '/curriculum', '/academic-years', '/rooms',
+  '/branches', '/assessments', '/assignments', '/schedule', '/programs',
+  '/announcements', '/documents', '/promotion', '/report-cards',
+]
+
+for (const url of LINKED_LISTS) {
+  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' })
+  if (response?.status() !== 200) {
+    console.log(`    ${url.padEnd(18)} http=${response?.status()} — skipped`)
+    continue
+  }
+  await page.locator('main').first().waitFor({ timeout: 30_000 })
+
+  const rows = await page.locator('main tbody tr').count()
+  if (rows === 0) {
+    console.log(`    ${url.padEnd(18)} no rows visible to this role — nothing to check`)
+    continue
+  }
+
+  // The link belongs in the first cell, which is what a reader clicks.
+  const linked = await page.locator('main tbody tr td:first-child a').count()
+  check(
+    `${url.padEnd(18)} rows link to the record`,
+    linked === rows,
+    `${linked}/${rows} linked`,
+  )
+}
+
 await browser.close()
 console.log(`\n${failures === 0 ? 'lists: all checks passed' : `${failures} check(s) failed`}`)
 process.exit(failures === 0 ? 0 : 1)

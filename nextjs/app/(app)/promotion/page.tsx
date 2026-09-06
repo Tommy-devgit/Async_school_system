@@ -1,6 +1,5 @@
 import { LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { toOdooOrder } from '@/lib/list-query'
 import { gradeOptions } from '@/lib/odoo/filter-options'
 import { canCreatePromotionBatch, listPromotionBatches } from '@/lib/odoo/models/assessment'
@@ -58,7 +57,7 @@ export default async function PromotionPage({ searchParams }: PageProps<'/promot
         {
           key: 'name',
           label: 'Batch',
-          render: (row) => <RowLink href={`/promotion/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         { key: 'from', label: 'From year', render: (row) => m2oLabel(row.academic_year_id) },
         {

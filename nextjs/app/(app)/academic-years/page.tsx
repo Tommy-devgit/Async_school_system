@@ -1,6 +1,5 @@
 import { Badge, DateText, LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { toOdooOrder } from '@/lib/list-query'
 import { hasAccess } from '@/lib/odoo/client'
 import { listAcademicYears } from '@/lib/odoo/models/school'
@@ -48,7 +47,7 @@ export default async function AcademicYearsPage({ searchParams }: PageProps<'/ac
           key: 'name',
           label: 'Year',
           sortField: 'name',
-          render: (row) => <RowLink href={`/academic-years/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         {
           key: 'start',

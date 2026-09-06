@@ -1,7 +1,6 @@
 import { Card, CardHeader, Note, StatusBadge } from '@/components/ui'
 import { formatPercent } from '@/lib/format'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { toOdooOrder } from '@/lib/list-query'
 import { classOptions, studentOptions, termOptions } from '@/lib/odoo/filter-options'
 import {
@@ -72,7 +71,7 @@ export default async function ReportCardsPage({ searchParams }: PageProps<'/repo
         {
           key: 'name',
           label: 'Report card',
-          render: (row) => <RowLink href={`/report-cards/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         { key: 'student', label: 'Student', render: (row) => m2oLabel(row.student_id) },
         { key: 'class', label: 'Class', hideBelow: 'sm', render: (row) => m2oLabel(row.class_id) },

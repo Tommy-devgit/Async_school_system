@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { DateText, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { formatSelection, formatText } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
 import { listPrograms } from '@/lib/odoo/models/operations'
@@ -55,7 +54,7 @@ export default async function ProgramsPage({ searchParams }: PageProps<'/program
           key: 'name',
           label: 'Program',
           sortField: 'name',
-          render: (row) => <RowLink href={`/programs/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         { key: 'type', label: 'Type', hideBelow: 'md', render: (row) => formatSelection(row.program_type) },
         {

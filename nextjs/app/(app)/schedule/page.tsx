@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { formatSelection, formatTimeRange, weekdayName } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
 import { classOptions, subjectOptions } from '@/lib/odoo/filter-options'
@@ -75,7 +74,7 @@ export default async function SchedulePage({ searchParams }: PageProps<'/schedul
           key: 'day',
           label: 'Day',
           sortField: 'day_of_week',
-          render: (row) => <RowLink href={`/schedule/${row.id}`}>{weekdayName(row.day_of_week)}</RowLink>,
+          render: (row) => weekdayName(row.day_of_week),
         },
         {
           key: 'time',

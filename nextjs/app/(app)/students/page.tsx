@@ -1,6 +1,5 @@
 import { LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { hasAccess } from '@/lib/odoo/client'
 import { classOptions } from '@/lib/odoo/filter-options'
 import { listStudents } from '@/lib/odoo/models/school'
@@ -68,7 +67,7 @@ export default async function StudentsPage({ searchParams }: PageProps<'/student
           key: 'name',
           label: 'Name',
           sortField: 'name',
-          render: (row) => <RowLink href={`/students/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         {
           key: 'regno',

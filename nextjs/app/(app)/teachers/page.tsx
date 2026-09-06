@@ -1,6 +1,5 @@
 import { LinkButton, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
-import { RowLink } from '@/components/ui/table'
 import { canCreateTeacher } from '@/lib/odoo/models/teacher'
 import { formatSelection, formatText } from '@/lib/format'
 import { toOdooOrder } from '@/lib/list-query'
@@ -53,7 +52,7 @@ export default async function TeachersPage({ searchParams }: PageProps<'/teacher
           key: 'name',
           label: 'Name',
           sortField: 'name',
-          render: (row) => <RowLink href={`/teachers/${row.id}`}>{row.name}</RowLink>,
+          render: (row) => row.name,
         },
         {
           key: 'teacherId',
