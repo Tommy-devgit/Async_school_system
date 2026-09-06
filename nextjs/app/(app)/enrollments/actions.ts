@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache' 
 import { redirect } from 'next/navigation' 
 import { requireSession } from '@/lib/odoo/auth' 
-import { toOdooError } from '@/lib/odoo/errors' 
+import { toOdooError } from '@/lib/odoo/errors'
+import { submitted } from '@/lib/form-values' 
 import {
   authorizeOverride,
   createEnrollment,
@@ -61,9 +62,13 @@ export async function createEnrollmentAction(
   redirect(`/enrollments/${enrollmentId}`)
 }
 
+const PROMOTION_FIELDS = ['nextYearId', 'nextClassId', 'effectiveDate'] as const
+
 export interface PromotionState {
   error?: string
   fieldErrors?: Record<string, string>
+  /** Echoed back so a refusal does not empty the form. */
+  values?: Record<(typeof PROMOTION_FIELDS)[number], string>
 }
 
 /**
@@ -94,7 +99,9 @@ export async function promoteEnrollmentAction(
     fieldErrors.nextYearId = 'Choose the year to promote into.'
   }
   if (!effectiveDate) fieldErrors.effectiveDate = 'Choose the date this takes effect.'
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+  if (Object.keys(fieldErrors).length > 0) {
+    return { fieldErrors, values: submitted(form, PROMOTION_FIELDS) }
+  }
 
   let newEnrollmentId: number | null
   try {
@@ -105,7 +112,7 @@ export async function promoteEnrollmentAction(
       effectiveDate,
     })
   } catch (cause) {
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, values: submitted(form, PROMOTION_FIELDS) }
   }
 
   revalidatePath('/enrollments')
@@ -113,10 +120,17 @@ export async function promoteEnrollmentAction(
   redirect(newEnrollmentId ? `/enrollments/${newEnrollmentId}` : '/enrollments')
 }
 
+const TRANSFER_FIELDS = ['new_class_id', 'effective_date', 'reason'] as const
+
 export interface TransferState {
   error?: string
   ok?: string
   fieldErrors?: Record<string, string>
+  /**
+   * Echoed back so a refusal does not empty the form — the reason in
+   * particular, which is written prose and is required.
+   */
+  values?: Record<(typeof TRANSFER_FIELDS)[number], string>
 }
 
 /**
@@ -148,12 +162,16 @@ export async function transferEnrollmentAction(
   }
   if (!effectiveDate) fieldErrors.effective_date = 'An effective date is required.'
   if (!reason) fieldErrors.reason = 'A reason is required — it is kept with the placement.'
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+  if (Object.keys(fieldErrors).length > 0) {
+    return { fieldErrors, values: submitted(form, TRANSFER_FIELDS) }
+  }
 
   try {
     await transferEnrollment({ enrollmentId, newClassId, effectiveDate, reason })
   } catch (cause) {
-    return { error: toOdooError(cause).message }
+    // A full class is refused here unless an override has been authorised, so
+    // this path is reached with a reason already written out.
+    return { error: toOdooError(cause).message, values: submitted(form, TRANSFER_FIELDS) }
   }
 
   revalidatePath(`/enrollments/${enrollmentId}`)
@@ -161,10 +179,19 @@ export async function transferEnrollmentAction(
   return { ok: 'Transferred. The previous placement is closed and kept as history.' }
 }
 
+const OVERRIDE_FIELDS = ['operation', 'reason'] as const
+
 export interface OverrideState {
   error?: string
   ok?: string
   fieldErrors?: Record<string, string>
+  /**
+   * Echoed back so a refusal does not empty the form. This one matters most:
+   * the reason is permanent, so it tends to be the most carefully written text
+   * anyone types into this application, and the refusals it runs into — wrong
+   * group, overrides disabled in settings — are ones the user cannot foresee.
+   */
+  values?: Record<(typeof OVERRIDE_FIELDS)[number], string>
 }
 
 /**
@@ -191,14 +218,17 @@ export async function authorizeOverrideAction(
   const fieldErrors: Record<string, string> = {}
   if (!operation) fieldErrors.operation = 'Choose what is being overridden.'
   if (!reason) fieldErrors.reason = 'A reason is required — it is permanent.'
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+  if (Object.keys(fieldErrors).length > 0) {
+    return { fieldErrors, values: submitted(form, OVERRIDE_FIELDS) }
+  }
 
   try {
     await authorizeOverride({ enrollmentId, operation, reason })
   } catch (cause) {
     // "Only a Principal or School Administrator can approve overrides." and
-    // "Enrollment overrides are disabled in School Settings."
-    return { error: toOdooError(cause).message }
+    // "Enrollment overrides are disabled in School Settings." Neither is
+    // something the user could have known before writing the reason.
+    return { error: toOdooError(cause).message, values: submitted(form, OVERRIDE_FIELDS) }
   }
 
   revalidatePath(`/enrollments/${enrollmentId}`)

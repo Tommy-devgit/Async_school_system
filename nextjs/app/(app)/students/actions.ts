@@ -6,6 +6,9 @@ import { redirect } from 'next/navigation'
 import { requireSession } from '@/lib/odoo/auth'
 import { readOne } from '@/lib/odoo/client'
 import { toOdooError } from '@/lib/odoo/errors'
+// Aliased: this module already has its own `submitted` over the student
+// intake fields, which the shared helper should eventually replace.
+import { submitted as submittedFields } from '@/lib/form-values'
 
 import { saveAnswer } from '@/lib/odoo/models/registration'
 import {
@@ -635,6 +638,8 @@ export async function uploadStudentDocumentAction(
 // Guardian actions
 // =======================================================
 
+const GUARDIAN_EDIT_FIELDS = ['relationship', 'phone', 'occupation', 'is_primary'] as const
+
 export interface GuardianFormState {
   error?: string
   fieldErrors?: Record<string, string>
@@ -805,8 +810,12 @@ export async function editGuardianAction(
       values,
     )
   } catch (cause) {
+    // Echoed back: the row re-renders from scratch after a refusal, and a
+    // guardian Odoo turned down for a clashing primary should not also cost
+    // the phone number that was just corrected.
     return {
       error: toOdooError(cause).message,
+      values: submittedFields(form, GUARDIAN_EDIT_FIELDS),
     }
   }
 

@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react'
 import { Badge, Button, Cell, DataTable, DateText, EmptyState, Row, cx } from '@/components/ui'
 import { Icon } from '@/components/icons'
-import { INPUT_CLASS, type Option } from '@/components/ui/form'
+import { INPUT_CLASS, useFormResponse, type Option } from '@/components/ui/form'
 import { formatSelection, todayIso } from '@/lib/format'
 import {
   addResponsibilityAction,
@@ -72,6 +72,17 @@ export function Responsibilities({
     setPrimaryResponsibilityAction,
     {},
   )
+
+  /*
+    A refused submit re-renders the form from scratch, so both forms below read
+    the rejected submission first and fall back to the record. Without it, a
+    responsibility Odoo turned down for a clashing primary cost the user the
+    campus, the manager and both dates as well as the refusal.
+  */
+  const addPrior = addState.values
+  const editPrior = editState.values
+  const editResponse = useFormResponse(editState)
+  const addResponse = useFormResponse(addState)
 
   const feedback = addState.error ?? endState.error ?? primaryState.error ?? editState.error
   const success = addState.ok ?? endState.ok ?? primaryState.ok ?? editState.ok
@@ -204,9 +215,10 @@ export function Responsibilities({
                       Responsibility <span className="text-danger">*</span>
                     </span>
                     <select
+                      key={`edit-responsibility-${editResponse}`}
                       name="responsibility"
                       required
-                      defaultValue={row.responsibility}
+                      defaultValue={editPrior?.responsibility ?? row.responsibility}
                       className={INPUT_CLASS}
                     >
                       {responsibilities.map((option) => (
@@ -220,7 +232,12 @@ export function Responsibilities({
                     <span className="mb-1.5 block text-[12px] font-medium text-graphite">
                       Department
                     </span>
-                    <select name="department" defaultValue={row.department || ''} className={INPUT_CLASS}>
+                    <select
+                      key={`edit-department-${editResponse}`}
+                      name="department"
+                      defaultValue={editPrior?.department ?? (row.department || '')}
+                      className={INPUT_CLASS}
+                    >
                       <option value="">Same as staff record</option>
                       {departments.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -237,7 +254,7 @@ export function Responsibilities({
                       type="date"
                       name="start_date"
                       required
-                      defaultValue={row.start_date || ''}
+                      defaultValue={editPrior?.start_date ?? (row.start_date || '')}
                       className={INPUT_CLASS}
                     />
                   </label>
@@ -248,14 +265,19 @@ export function Responsibilities({
                     <input
                       type="date"
                       name="end_date"
-                      defaultValue={row.end_date || ''}
+                      defaultValue={editPrior?.end_date ?? (row.end_date || '')}
                       className={INPUT_CLASS}
                     />
                   </label>
                   {campuses.length ? (
                     <label className="block">
                       <span className="mb-1.5 block text-[12px] font-medium text-graphite">Campus</span>
-                      <select name="campus_id" defaultValue={campusValue(row, campuses)} className={INPUT_CLASS}>
+                      <select
+                        key={`edit-campus-${editResponse}`}
+                        name="campus_id"
+                        defaultValue={editPrior?.campus_id ?? campusValue(row, campuses)}
+                        className={INPUT_CLASS}
+                      >
                         <option value="">None</option>
                         {campuses.map((campus) => (
                           <option key={campus.id} value={campus.id}>
@@ -270,7 +292,12 @@ export function Responsibilities({
                       <span className="mb-1.5 block text-[12px] font-medium text-graphite">
                         Reporting manager
                       </span>
-                      <select name="manager_id" defaultValue={managerValue(row, managers)} className={INPUT_CLASS}>
+                      <select
+                        key={`edit-manager-${editResponse}`}
+                        name="manager_id"
+                        defaultValue={editPrior?.manager_id ?? managerValue(row, managers)}
+                        className={INPUT_CLASS}
+                      >
                         <option value="">None</option>
                         {managers.map((manager) => (
                           <option key={manager.id} value={manager.id}>
@@ -316,7 +343,13 @@ export function Responsibilities({
                   <span className="mb-1.5 block text-[12px] font-medium text-graphite">
                     Responsibility <span className="text-danger">*</span>
                   </span>
-                  <select name="responsibility" required className={INPUT_CLASS}>
+                  <select
+                    key={`add-responsibility-${addResponse}`}
+                    name="responsibility"
+                    required
+                    defaultValue={addPrior?.responsibility ?? ''}
+                    className={INPUT_CLASS}
+                  >
                     <option value="">Choose…</option>
                     {responsibilities.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -327,7 +360,12 @@ export function Responsibilities({
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-graphite">Department</span>
-                  <select name="department" className={INPUT_CLASS}>
+                  <select
+                    key={`add-department-${addResponse}`}
+                    name="department"
+                    defaultValue={addPrior?.department ?? ''}
+                    className={INPUT_CLASS}
+                  >
                     <option value="">Same as staff record</option>
                     {departments.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -344,14 +382,19 @@ export function Responsibilities({
                     type="date"
                     name="start_date"
                     required
-                    defaultValue={todayIso()}
+                    defaultValue={addPrior?.start_date ?? todayIso()}
                     className={INPUT_CLASS}
                   />
                 </label>
                 {campuses.length ? (
                   <label className="block">
                     <span className="mb-1.5 block text-[12px] font-medium text-graphite">Campus</span>
-                    <select name="campus_id" className={INPUT_CLASS}>
+                    <select
+                      key={`add-campus-${addResponse}`}
+                      name="campus_id"
+                      defaultValue={addPrior?.campus_id ?? ''}
+                      className={INPUT_CLASS}
+                    >
                       <option value="">None</option>
                       {campuses.map((campus) => (
                         <option key={campus.id} value={campus.id}>
@@ -366,7 +409,12 @@ export function Responsibilities({
                     <span className="mb-1.5 block text-[12px] font-medium text-graphite">
                       Reporting manager
                     </span>
-                    <select name="manager_id" className={INPUT_CLASS}>
+                    <select
+                      key={`add-manager-${addResponse}`}
+                      name="manager_id"
+                      defaultValue={addPrior?.manager_id ?? ''}
+                      className={INPUT_CLASS}
+                    >
                       <option value="">None</option>
                       {managers.map((manager) => (
                         <option key={manager.id} value={manager.id}>
@@ -381,7 +429,7 @@ export function Responsibilities({
                 <input
                   type="checkbox"
                   name="is_primary"
-                  defaultChecked={activeCount === 0}
+                  defaultChecked={addPrior ? addPrior.is_primary === 'on' : activeCount === 0}
                   className="h-4 w-4 rounded border-silver"
                 />
                 Make this the primary responsibility

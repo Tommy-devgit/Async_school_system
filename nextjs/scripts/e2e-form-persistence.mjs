@@ -7,10 +7,15 @@
  * whatever it was created with, so a refused save silently reverts the choice
  * to a plausible-looking old value. See `useFormResponse` in components/ui/form.
  *
- * /teachers/new is the case this is held against, because it refuses a weak
- * password inside the action, before any Odoo write. So this suite reads and
- * never writes — but it still asks the production guard first, because the
- * next person to add a case here should not have to remember to.
+ * The other half is the action's: a form can only re-seed from values the
+ * action hands back, and several actions used to return an error and nothing
+ * else. `submitted()` in lib/form-values is the shared echo those now use.
+ *
+ * Every case here is chosen so the refusal happens *before* anything is
+ * written — a weak password, a sign-in with the wrong password, a second
+ * primary responsibility Odoo rejects outright. So this suite reads and never
+ * writes, but it still asks the production guard first, because the next
+ * person to add a case here should not have to remember to.
  *
  *   ODOO_BASE_URL / ODOO_DB   the Odoo behind the app under test
  *   E2E_PASSWORD              shared demo password
@@ -131,6 +136,115 @@ check(
   page.url().includes('/teachers/new'),
   'the action refuses before it writes',
 )
+
+/* ------------------------------------ a refused sign-in keeps the email --- */
+
+/*
+  The login form is the one every user meets, and mistyping a password used to
+  cost the email address as well — on exactly the shared machines where school
+  logins are least convenient to retype.
+*/
+console.log('\na refused sign-in keeps the email address')
+const anon = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+const anonPage = await anon.newPage()
+await anonPage.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await anonPage.fill('#login', LOGIN)
+await anonPage.fill('#password', 'definitely-not-the-password')
+await anonPage.click('#submit-login')
+await anonPage.waitForTimeout(2500)
+
+check('the sign-in was refused', anonPage.url().includes('/login'), anonPage.url())
+check('a refusal is shown', (await anonPage.locator('[role="alert"]').count()) > 0)
+check(
+  'the email is still there',
+  (await anonPage.inputValue('#login')) === LOGIN,
+  await anonPage.inputValue('#login'),
+)
+check(
+  'the password was not echoed back',
+  (await anonPage.inputValue('#password')) === '',
+  'a password must never be re-rendered into the page',
+)
+
+// The same refusal twice, which is what a half-remembered password looks like.
+await anonPage.fill('#password', 'still-not-the-password')
+await anonPage.click('#submit-login')
+await anonPage.waitForTimeout(2500)
+check(
+  'after a second refusal the email is still there',
+  (await anonPage.inputValue('#login')) === LOGIN,
+)
+await anon.close()
+
+/* ------------------------ a refused responsibility keeps what was chosen --- */
+
+/*
+  An Odoo refusal rather than a client-side one: `_check_single_primary`
+  rejects a second primary responsibility, and rejects it during create, so
+  nothing is written. Before the echo this cost the department, the date and
+  the tick as well as the refusal.
+*/
+const STAFF_ID = process.env.E2E_STAFF_ID
+if (STAFF_ID) {
+  console.log('\na refused responsibility keeps what was chosen')
+  await page.goto(`${BASE}/staff/${STAFF_ID}`, { waitUntil: 'domcontentloaded' })
+  await page.locator('main h1').first().waitFor({ timeout: 30_000 })
+
+  const addButton = page.locator('button:has-text("Add responsibility")')
+  if ((await addButton.count()) > 0) {
+    await addButton.click()
+    const form = page.locator('form:has(select[name="responsibility"])').last()
+    await form.locator('select[name="responsibility"]').waitFor({ timeout: 10_000 })
+
+    const firstValue = async (selector) => {
+      for (const option of await form.locator(`${selector} option`).all()) {
+        const value = await option.getAttribute('value')
+        if (value) return value
+      }
+      return ''
+    }
+
+    const responsibility = await firstValue('select[name="responsibility"]')
+    const department = await firstValue('select[name="department"]')
+    await form.locator('select[name="responsibility"]').selectOption(responsibility)
+    if (department) await form.locator('select[name="department"]').selectOption(department)
+    await form.locator('input[name="start_date"]').fill('2026-03-03')
+
+    // The refusal: this staff member already holds a primary responsibility.
+    const primary = form.locator('input[name="is_primary"]')
+    if (!(await primary.isChecked())) await primary.check()
+
+    await form.locator('button:has-text("Add responsibility")').click()
+    await page.waitForTimeout(2500)
+
+    const shown = (await page.locator('main').textContent()) ?? ''
+    check('Odoo refused the second primary', /primary/i.test(shown))
+
+    const after = page.locator('form:has(select[name="responsibility"])').last()
+    check(
+      'the responsibility is still chosen',
+      (await after.locator('select[name="responsibility"]').inputValue()) === responsibility,
+    )
+    if (department) {
+      check(
+        'the department is still chosen',
+        (await after.locator('select[name="department"]').inputValue()) === department,
+      )
+    }
+    check(
+      'the start date is still there',
+      (await after.locator('input[name="start_date"]').inputValue()) === '2026-03-03',
+    )
+    check(
+      'the primary box is still ticked',
+      await after.locator('input[name="is_primary"]').isChecked(),
+    )
+  } else {
+    console.log('  SKIPPED — this role is offered no Add responsibility control')
+  }
+} else {
+  console.log('\nresponsibility echo: SKIPPED — set E2E_STAFF_ID to a staff member with a primary')
+}
 
 await browser.close()
 console.log(failures === 0 ? '\nform persistence: ok' : `\nform persistence: ${failures} FAILED`)

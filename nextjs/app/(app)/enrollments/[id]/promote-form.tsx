@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { EthiopianDateInput } from '@/components/ui/ethiopian-date-input'
+import { useFormResponse } from '@/components/ui/form'
 import { promoteEnrollmentAction, type PromotionState } from '../actions'
 
 export interface YearChoice {
@@ -44,6 +45,15 @@ export function PromoteForm({
   const [yearId, setYearId] = useState('')
 
   const errors = state.fieldErrors ?? {}
+
+  /*
+    Read the rejected submission back before the local state. The year select
+    still drives which classes are offered, so its value stays mirrored in
+    `yearId`, but the field itself is seeded from the echo — see
+    useFormResponse for why a controlled field cannot survive the reset.
+  */
+  const prior = state.values
+  const response = useFormResponse(state)
   const classesInYear = classes.filter((item) => String(item.yearId ?? '') === yearId)
 
   if (!open) {
@@ -72,8 +82,9 @@ export function PromoteForm({
           Next academic year <span className="text-danger">*</span>
         </span>
         <select
+          key={`nextYearId-${response}`}
           name="nextYearId"
-          value={yearId}
+          defaultValue={prior?.nextYearId ?? yearId}
           onChange={(event) => setYearId(event.target.value)}
           className={CONTROL}
         >
@@ -93,7 +104,13 @@ export function PromoteForm({
 
       <label className="block">
         <span className="mb-1 block text-[11px] font-medium text-graphite">Class</span>
-        <select name="nextClassId" defaultValue="" className={CONTROL} disabled={!yearId}>
+        <select
+          key={`nextClassId-${response}`}
+          name="nextClassId"
+          defaultValue={prior?.nextClassId ?? ''}
+          className={CONTROL}
+          disabled={!yearId}
+        >
           <option value="">Next grade up, same section</option>
           {classesInYear.map((item) => (
             <option key={item.id} value={item.id}>
@@ -112,7 +129,13 @@ export function PromoteForm({
         <span className="mb-1 block text-[11px] font-medium text-graphite">
           Takes effect <span className="text-danger">*</span>
         </span>
-        <EthiopianDateInput name="effectiveDate" />
+        {/* Keyed: it keeps the date in its own state, so a new default only
+            reaches it on a remount. */}
+        <EthiopianDateInput
+          key={`effectiveDate-${response}`}
+          name="effectiveDate"
+          defaultValue={prior?.effectiveDate ?? ''}
+        />
         {errors.effectiveDate ? (
           <span role="alert" className="mt-1 block text-[11px] text-danger">
             {errors.effectiveDate}
