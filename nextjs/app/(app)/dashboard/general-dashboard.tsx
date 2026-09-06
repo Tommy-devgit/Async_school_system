@@ -1,4 +1,11 @@
-import { CommandHeader, KpiBand, NeedsAttention, Panel, Section } from '@/components/dashboard/command-center'
+import {
+  CommandHeader,
+  KpiBand,
+  NeedsAttention,
+  Panel,
+  Section,
+  type Kpi,
+} from '@/components/dashboard/command-center'
 import { LinkButton, Note } from '@/components/ui'
 import {
   assessmentsAwaitingApproval,
@@ -28,6 +35,24 @@ import { AssessmentPipeline, RecentActivity, ReportCardPipeline, StaffStates } f
  * Whatever Odoo refuses simply does not appear, and the note at the foot says
  * so when almost everything is refused.
  */
+
+/**
+ * Drops the tiles this role can never fill.
+ *
+ * A refused model would otherwise read "Not available to your role" on every
+ * visit: an exam officer saw that for staff, an HR officer for marks and
+ * report cards — most of a dashboard spent saying no.
+ *
+ * `groupBy` is the honest signal. It returns null only when Odoo refuses the
+ * model, because an empty one still returns an empty list; `aggregate` returns
+ * null for both a refusal and an average of nothing, so it cannot be used to
+ * tell them apart. The refusal is still explained where it is news — opening
+ * the screen itself — and simply omitted where it is only the shape of the job.
+ */
+function kpis(readable: Record<string, boolean>, items: Kpi[]): Kpi[] {
+  return items.filter((item) => readable[item.label] !== false)
+}
+
 export async function GeneralDashboard({
   user,
   roles,
@@ -86,8 +111,25 @@ export async function GeneralDashboard({
         }
       />
 
+      {/*
+        A tile or a panel the role can never read is dropped, not rendered as
+        a permanent "Not available to your role".
+
+        An exam officer holds no ACL row on school.staff, so the staff tile and
+        the staff-states panel were telling them so on every visit — two thirds
+        of a section spent saying no. The refusal is still explained where it
+        is news; here it is simply the shape of the job.
+      */}
       <KpiBand
-        items={[
+        items={kpis(
+          {
+            Students: students.total !== null,
+            Staff: staff.total !== null,
+            // school.mark, read through a groupBy that survives an empty school.
+            'Mean mark': performance.bySubject !== null,
+            'Report cards': performance.reportCards !== null,
+          },
+          [
           {
             label: 'Students',
             value: students.total,
@@ -123,7 +165,7 @@ export async function GeneralDashboard({
             icon: 'reportCards',
             href: '/report-cards',
           },
-        ]}
+        ])}
       />
 
       <Section title="Waiting on you">
@@ -155,17 +197,21 @@ export async function GeneralDashboard({
               ]}
             />
           </Panel>
-          <AssessmentPipeline performance={performance} />
-          <ReportCardPipeline performance={performance} />
+          {performance.assessments === null ? null : (
+            <AssessmentPipeline performance={performance} />
+          )}
+          {performance.reportCards === null ? null : (
+            <ReportCardPipeline performance={performance} />
+          )}
         </div>
       </Section>
 
       <Section title="Activity">
         <div className="grid items-start gap-3 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+          <div className={staff.total === null ? 'lg:col-span-3' : 'lg:col-span-2'}>
             <RecentActivity entries={activity} />
           </div>
-          <StaffStates staff={staff} />
+          {staff.total === null ? null : <StaffStates staff={staff} />}
         </div>
       </Section>
 

@@ -15,10 +15,18 @@ import { chromium } from 'playwright-core'
 import { login, call } from './rpc.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:3101'
-const ADMIN = process.env.E2E_LOGIN
+/*
+  The administrator needs its own variable.
+
+  This read E2E_LOGIN — the generic login every other suite uses — so running
+  them together, with E2E_LOGIN set to a registrar, checked that registrar
+  against the *administrator's* landing page and reported one failure. The same
+  trap was in e2e-navigation-access; this was the other copy of it.
+*/
+const ADMIN = process.env.E2E_ADMIN_LOGIN
 const ADMIN_PASSWORD = process.env.E2E_PASSWORD
 if (!ADMIN || !ADMIN_PASSWORD) {
-  console.error('Set E2E_LOGIN and E2E_PASSWORD before running this script.')
+  console.error('Set E2E_ADMIN_LOGIN and E2E_PASSWORD before running this script.')
   process.exit(2)
 }
 
@@ -66,7 +74,11 @@ async function landingFor(loginName, password) {
 try {
   /* An administrator holds every group, so precedence must give the overview. */
   const asAdmin = await landingFor(ADMIN, ADMIN_PASSWORD)
-  check('administrator lands on the dashboard', asAdmin.path === '/dashboard', asAdmin.path)
+  check(
+    `administrator (${ADMIN}) lands on the dashboard`,
+    asAdmin.path === '/dashboard',
+    asAdmin.path,
+  )
 
   for (const [group, expected] of EXPECTED) {
     const [gid] = await call('ir.model.data', 'search_read',
