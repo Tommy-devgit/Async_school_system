@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react'
 import { Badge, Button, EmptyState } from '@/components/ui'
-import { Field, FormError, FormSuccess, INPUT_CLASS } from '@/components/ui/form'
+import { Field, FormError, FormSuccess, INPUT_CLASS, useFormResponse } from '@/components/ui/form'
 import { saveAnswersAction, type AnswerState } from '../actions'
 
 export interface QuestionView {
@@ -39,6 +39,15 @@ export function Questionnaire({
     saveAnswersAction,
     {},
   )
+
+  /*
+    A refusal part-way through the roster leaves the earlier answers written
+    and the later ones not. Re-seeding from the submission is what keeps the
+    unsaved ones on screen — otherwise they revert to the stored value and
+    read as though they had been saved.
+  */
+  const answer = (field: string) => state.values?.[field]
+  const response = useFormResponse(state)
 
   if (questions.length === 0) {
     return (
@@ -95,9 +104,10 @@ export function Questionnaire({
             >
               {question.answerType === 'selection' ? (
                 <select
+                  key={`option-${question.id}-${response}`}
                   id={`option-${question.id}`}
                   name={`option-${question.id}`}
-                  defaultValue={question.optionId}
+                  defaultValue={answer(`option-${question.id}`) ?? question.optionId}
                   disabled={!canWrite}
                   className={INPUT_CLASS}
                 >
@@ -110,9 +120,10 @@ export function Questionnaire({
                 </select>
               ) : question.answerType === 'boolean' ? (
                 <select
+                  key={`text-${question.id}-${response}`}
                   id={`text-${question.id}`}
                   name={`text-${question.id}`}
-                  defaultValue={question.valueText}
+                  defaultValue={answer(`text-${question.id}`) ?? question.valueText}
                   disabled={!canWrite}
                   className={INPUT_CLASS}
                 >
@@ -131,7 +142,7 @@ export function Questionnaire({
                         ? 'number'
                         : 'text'
                   }
-                  defaultValue={question.valueText}
+                  defaultValue={answer(`text-${question.id}`) ?? question.valueText}
                   disabled={!canWrite}
                   className={INPUT_CLASS}
                 />

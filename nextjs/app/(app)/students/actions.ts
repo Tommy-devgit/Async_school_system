@@ -947,9 +947,25 @@ export async function updateStudentAction(
 // Registration questionnaire
 // =======================================================
 
+/*
+  The questionnaire's field names are per question — `option-41`, `text-41` —
+  so the echo cannot be a fixed tuple the way every other form's is. Whatever
+  the form submitted under those two prefixes is what comes back.
+*/
+function submittedAnswers(form: FormData): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const [key, value] of form.entries()) {
+    if (typeof value !== 'string') continue
+    if (key.startsWith('option-') || key.startsWith('text-')) values[key] = value
+  }
+  return values
+}
+
 export interface AnswerState {
   error?: string
   ok?: string
+  /** Every answer as submitted, keyed `option-<id>` / `text-<id>`. */
+  values?: Record<string, string>
 }
 
 /**
@@ -999,7 +1015,13 @@ export async function saveAnswersAction(
       })
       saved += 1
     } catch (cause) {
-      return { error: toOdooError(cause).message }
+      /*
+        Odoo refused one answer, and the ones before it in this loop are
+        already written. So the whole roster is echoed back: without it the
+        page re-renders from the record and every answer *after* the refusal
+        silently reverts to what was stored, which reads as though it saved.
+      */
+      return { error: toOdooError(cause).message, values: submittedAnswers(form) }
     }
   }
 

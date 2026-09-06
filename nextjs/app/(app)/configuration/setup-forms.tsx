@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import { useFormResponse } from '@/components/ui/form'
 import { EthiopianDateInput } from '@/components/ui/ethiopian-date-input'
 import { ethiopianYearOf } from '@/lib/ethiopian-date'
 import {
@@ -63,7 +64,23 @@ function fieldError(state: SetupState, key: string) {
 
 export function SchoolSetupForm({ grades }: { grades: Choice[] }) {
   const [state, formAction, pending] = useActionState<SetupState, FormData>(schoolSetupAction, {})
-  const [dateStart, setDateStart] = useState('')
+
+  /*
+    A refused setup used to cost every choice on this form — two dates, the
+    term count, the section names and a tick against every grade in the school
+    — for a refusal the user could not have foreseen, such as a year that
+    already exists. Each field is now re-seeded from what was submitted.
+  */
+  const prior = state.values
+  const priorGrades = state.selected?.gradeIds
+  const response = useFormResponse(state)
+
+  const [dateStart, setDateStart] = useState(prior?.dateStart ?? '')
+  const [seen, setSeen] = useState(response)
+  if (seen !== response) {
+    setSeen(response)
+    setDateStart(prior?.dateStart ?? '')
+  }
   const derived = dateStart ? ethiopianYearOf(dateStart) : null
 
   return (
@@ -71,12 +88,23 @@ export function SchoolSetupForm({ grades }: { grades: Choice[] }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label required>Starts on</Label>
-          <EthiopianDateInput name="dateStart" onChange={setDateStart} />
+          {/* Keyed: it keeps the date in its own state, so a new default only
+              reaches it on a remount. */}
+          <EthiopianDateInput
+            key={`dateStart-${response}`}
+            name="dateStart"
+            defaultValue={prior?.dateStart ?? ''}
+            onChange={setDateStart}
+          />
           {fieldError(state, 'dateStart')}
         </div>
         <div>
           <Label required>Ends on</Label>
-          <EthiopianDateInput name="dateEnd" />
+          <EthiopianDateInput
+            key={`dateEnd-${response}`}
+            name="dateEnd"
+            defaultValue={prior?.dateEnd ?? ''}
+          />
           {fieldError(state, 'dateEnd')}
         </div>
       </div>
@@ -90,7 +118,12 @@ export function SchoolSetupForm({ grades }: { grades: Choice[] }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <Label required>Divided into</Label>
-          <select name="termCount" defaultValue="3" className={CONTROL}>
+          <select
+            key={`termCount-${response}`}
+            name="termCount"
+            defaultValue={prior?.termCount || '3'}
+            className={CONTROL}
+          >
             <option value="1">One term</option>
             <option value="2">Two semesters</option>
             <option value="3">Three terms</option>
@@ -100,7 +133,12 @@ export function SchoolSetupForm({ grades }: { grades: Choice[] }) {
 
         <label className="block">
           <Label>Sections per grade</Label>
-          <input name="sectionNames" defaultValue="A" placeholder="A, B" className={CONTROL} />
+          <input
+            name="sectionNames"
+            defaultValue={prior ? prior.sectionNames : 'A'}
+            placeholder="A, B"
+            className={CONTROL}
+          />
           <span className="mt-1 block text-[11px] text-stone">
             Comma separated. One class is created per grade and section.
           </span>
@@ -110,10 +148,12 @@ export function SchoolSetupForm({ grades }: { grades: Choice[] }) {
       <div>
         <Label required>Grades</Label>
         <select
+          key={`gradeIds-${response}`}
           name="gradeIds"
           multiple
           size={Math.min(8, Math.max(4, grades.length))}
-          defaultValue={grades.map((grade) => String(grade.id))}
+          // Every grade by default; whatever was actually picked after a refusal.
+          defaultValue={priorGrades ?? grades.map((grade) => String(grade.id))}
           className={CONTROL}
         >
           {grades.map((grade) => (
@@ -126,7 +166,12 @@ export function SchoolSetupForm({ grades }: { grades: Choice[] }) {
       </div>
 
       <label className="flex cursor-pointer items-center gap-2">
-        <input type="checkbox" name="isCurrent" defaultChecked className="h-4 w-4 rounded border-silver" />
+        <input
+          type="checkbox"
+          name="isCurrent"
+          defaultChecked={prior ? prior.isCurrent === 'on' : true}
+          className="h-4 w-4 rounded border-silver"
+        />
         <span className="text-[12px] text-graphite">Make this the current year</span>
       </label>
 
@@ -158,12 +203,21 @@ export function GradeSectionsForm({
 }) {
   const [state, formAction, pending] = useActionState<SetupState, FormData>(gradeSectionsAction, {})
 
+  // Re-seeded from the rejected submission; see SchoolSetupForm above.
+  const prior = state.values
+  const response = useFormResponse(state)
+
   return (
     <form action={formAction} className="space-y-3 p-6 pt-0">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <Label required>Grade</Label>
-          <select name="gradeId" defaultValue="" className={CONTROL}>
+          <select
+            key={`gradeId-${response}`}
+            name="gradeId"
+            defaultValue={prior?.gradeId ?? ''}
+            className={CONTROL}
+          >
             <option value="">Choose a grade…</option>
             {grades.map((grade) => (
               <option key={grade.id} value={grade.id}>
@@ -176,7 +230,12 @@ export function GradeSectionsForm({
 
         <label className="block">
           <Label required>Academic year</Label>
-          <select name="academicYearId" defaultValue="" className={CONTROL}>
+          <select
+            key={`academicYearId-${response}`}
+            name="academicYearId"
+            defaultValue={prior?.academicYearId ?? ''}
+            className={CONTROL}
+          >
             <option value="">Choose a year…</option>
             {years.map((year) => (
               <option key={year.id} value={year.id}>
@@ -191,9 +250,11 @@ export function GradeSectionsForm({
       <div>
         <Label>Existing sections</Label>
         <select
+          key={`sectionIds-${response}`}
           name="sectionIds"
           multiple
           size={Math.min(6, Math.max(3, sections.length))}
+          defaultValue={state.selected?.sectionIds ?? []}
           className={CONTROL}
         >
           {sections.map((section) => (
@@ -207,7 +268,12 @@ export function GradeSectionsForm({
 
       <label className="block">
         <Label>Or new ones</Label>
-        <input name="newSectionNames" placeholder="C, D" className={CONTROL} />
+        <input
+          name="newSectionNames"
+          defaultValue={prior?.newSectionNames ?? ''}
+          placeholder="C, D"
+          className={CONTROL}
+        />
       </label>
 
       <div className="flex items-center gap-3 pt-1">
@@ -236,7 +302,23 @@ export function ClassSubjectsForm({
   currentByClass: Record<number, number[]>
 }) {
   const [state, formAction, pending] = useActionState<SetupState, FormData>(classSubjectsAction, {})
-  const [classId, setClassId] = useState('')
+
+  /*
+    The class picker drives which subjects are pre-ticked, so its value is
+    mirrored in client state — but it is not the source of truth for the field.
+    A controlled field cannot survive React 19's post-action form reset; see
+    useFormResponse.
+  */
+  const prior = state.values
+  const response = useFormResponse(state)
+  const submittedClassId = prior?.classId ?? ''
+
+  const [classId, setClassId] = useState(submittedClassId)
+  const [seen, setSeen] = useState(response)
+  if (seen !== response) {
+    setSeen(response)
+    setClassId(submittedClassId)
+  }
 
   const current = currentByClass[Number(classId)] ?? []
 
@@ -245,8 +327,9 @@ export function ClassSubjectsForm({
       <label className="block">
         <Label required>Class</Label>
         <select
+          key={`classId-${response}`}
           name="classId"
-          value={classId}
+          defaultValue={submittedClassId}
           onChange={(event) => setClassId(event.target.value)}
           className={CONTROL}
         >
@@ -263,12 +346,16 @@ export function ClassSubjectsForm({
       <div>
         <Label>Subjects</Label>
         <select
-          // Remounts on a class change so the current curriculum shows as selected.
-          key={classId}
+          /*
+            Remounts on a class change so the current curriculum shows as
+            selected, and on each reply from the action so a refusal does not
+            reset the ticks — the reply is in the key for that second reason.
+          */
+          key={`${classId}-${response}`}
           name="subjectIds"
           multiple
           size={Math.min(10, Math.max(5, subjects.length))}
-          defaultValue={current.map(String)}
+          defaultValue={state.selected?.subjectIds ?? current.map(String)}
           disabled={!classId}
           className={CONTROL}
         >
@@ -288,7 +375,12 @@ export function ClassSubjectsForm({
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block">
           <Label required>Type</Label>
-          <select name="subjectType" defaultValue="compulsory" className={CONTROL}>
+          <select
+            key={`subjectType-${response}`}
+            name="subjectType"
+            defaultValue={prior?.subjectType || 'compulsory'}
+            className={CONTROL}
+          >
             <option value="compulsory">Compulsory</option>
             <option value="optional">Optional</option>
             <option value="stream">Stream</option>
@@ -299,13 +391,27 @@ export function ClassSubjectsForm({
 
         <label className="block">
           <Label required>Maximum mark</Label>
-          <input name="maximumMark" type="number" step="0.01" min={0.01} defaultValue="100" className={CONTROL} />
+          <input
+            name="maximumMark"
+            type="number"
+            step="0.01"
+            min={0.01}
+            defaultValue={prior ? prior.maximumMark : '100'}
+            className={CONTROL}
+          />
           {fieldError(state, 'maximumMark')}
         </label>
 
         <label className="block">
           <Label required>Pass mark</Label>
-          <input name="passMark" type="number" step="0.01" min={0} defaultValue="50" className={CONTROL} />
+          <input
+            name="passMark"
+            type="number"
+            step="0.01"
+            min={0}
+            defaultValue={prior ? prior.passMark : '50'}
+            className={CONTROL}
+          />
           {fieldError(state, 'passMark')}
         </label>
       </div>
