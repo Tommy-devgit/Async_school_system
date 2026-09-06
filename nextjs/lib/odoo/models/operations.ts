@@ -418,6 +418,45 @@ const AUDIENCE_VALUE_FIELDS = {
 
 export type AudienceType = keyof typeof AUDIENCE_VALUE_FIELDS | 'all_staff'
 
+/**
+ * Every audience field, with only the chosen one set.
+ *
+ * `school.program` and `school.announcement` share this shape, and both drop
+ * the values that no longer apply in an `@api.onchange('audience_type')`. An
+ * onchange never fires over JSON-RPC, so nothing would clear them here:
+ * switching a record from "Class / Section" to "Department" would set
+ * `department` and leave `class_ids` populated. `_check_audience_values` looks
+ * only at the field matching the new type, so Odoo accepts it, and the record
+ * ends up carrying two audiences with one of them invisible on screen.
+ *
+ * So the write is always the full set. Sending the clears explicitly is the
+ * only way to make an audience change mean what it says.
+ */
+function audiencePayload(
+  audienceType: AudienceType,
+  audienceValue: string | number[],
+): Record<string, unknown> {
+  const chosen = audienceType === 'all_staff' ? null : AUDIENCE_VALUE_FIELDS[audienceType]
+
+  const values: Record<string, unknown> = {
+    department: false,
+    responsibility: false,
+    // 6 replaces the whole set; an empty list is how a many2many is cleared.
+    teacher_ids: [[6, 0, []]],
+    subject_ids: [[6, 0, []]],
+    class_ids: [[6, 0, []]],
+    campus_ids: [[6, 0, []]],
+    staff_ids: [[6, 0, []]],
+  }
+
+  if (chosen) {
+    values[chosen] = Array.isArray(audienceValue) ? [[6, 0, audienceValue]] : audienceValue
+  }
+
+  return values
+}
+
+
 /** The record-backed audience types, and the model each one picks from. */
 const AUDIENCE_RECORD_MODELS = {
   teacher_group: 'school.teacher',
@@ -487,16 +526,10 @@ export function createAnnouncement(intake: AnnouncementIntake): Promise<number> 
     link: intake.link || false,
   }
 
-  const field =
-    intake.audience_type === 'all_staff' ? null : AUDIENCE_VALUE_FIELDS[intake.audience_type]
-  if (field) {
-    // Odoo's many2many write command: 6 replaces the whole set.
-    values[field] = Array.isArray(intake.audience_value)
-      ? [[6, 0, intake.audience_value]]
-      : intake.audience_value
-  }
-
-  return create('school.announcement', values)
+  return create('school.announcement', {
+    ...values,
+    ...audiencePayload(intake.audience_type, intake.audience_value),
+  })
 }
 
 /** The audience fields, read back so an edit form can open on what is set. */
@@ -543,15 +576,17 @@ export function updateAnnouncement(
     link: intake.link || false,
   }
 
+  /*
+    Only while the announcement is still draft — a published one posts no
+    audience at all, and writing the clears then would wipe the target the
+    publish already resolved.
+  */
   if (intake.audience_type) {
     values.audience_type = intake.audience_type
-    const field =
-      intake.audience_type === 'all_staff' ? null : AUDIENCE_VALUE_FIELDS[intake.audience_type]
-    if (field) {
-      values[field] = Array.isArray(intake.audience_value)
-        ? [[6, 0, intake.audience_value]]
-        : intake.audience_value
-    }
+    Object.assign(
+      values,
+      audiencePayload(intake.audience_type, intake.audience_value ?? ''),
+    )
   }
 
   return write('school.announcement', [id], values)
@@ -646,45 +681,6 @@ export interface ProgramIntake {
   description?: string
 }
 
-/**
- * Every audience field, with only the chosen one set.
- *
- * The model has an `@api.onchange('audience_type')` that drops the values that
- * no longer apply — and an onchange never fires over JSON-RPC, so nothing
- * would clear them. Switching a program from "Class / Section" to "Department"
- * would leave `class_ids` populated: `_check_audience_values` looks only at
- * the field matching the new type, so Odoo accepts it, and the record ends up
- * carrying two audiences with one of them invisible on screen.
- *
- * So the write is always the full set. Sending the clears explicitly is the
- * only way to make an audience change mean what it says.
- */
-function programAudience(
-  audienceType: AudienceType,
-  audienceValue: string | number[],
-): Record<string, unknown> {
-  const chosen = audienceType === 'all_staff' ? null : AUDIENCE_VALUE_FIELDS[audienceType]
-
-  const values: Record<string, unknown> = {
-    department: false,
-    responsibility: false,
-    // 6 replaces the whole set; an empty list is how a many2many is cleared.
-    teacher_ids: [[6, 0, []]],
-    subject_ids: [[6, 0, []]],
-    class_ids: [[6, 0, []]],
-    campus_ids: [[6, 0, []]],
-    staff_ids: [[6, 0, []]],
-  }
-
-  if (chosen) {
-    values[chosen] = Array.isArray(audienceValue)
-      ? [[6, 0, audienceValue]]
-      : audienceValue
-  }
-
-  return values
-}
-
 function programValues(intake: ProgramIntake): Record<string, unknown> {
   return {
     name: intake.name,
@@ -695,7 +691,7 @@ function programValues(intake: ProgramIntake): Record<string, unknown> {
     location: intake.location || false,
     organizer_id: intake.organizer_id || false,
     description: intake.description || false,
-    ...programAudience(intake.audience_type, intake.audience_value),
+    ...audiencePayload(intake.audience_type, intake.audience_value),
   }
 }
 
