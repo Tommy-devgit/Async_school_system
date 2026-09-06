@@ -8,7 +8,7 @@ import { readOne } from '@/lib/odoo/client'
 import { toOdooError } from '@/lib/odoo/errors'
 // Aliased: this module already has its own `submitted` over the student
 // intake fields, which the shared helper should eventually replace.
-import { submitted as submittedFields } from '@/lib/form-values'
+import { relationalId, submitted as submittedFields } from '@/lib/form-values'
 
 import { saveAnswer } from '@/lib/odoo/models/registration'
 import {
@@ -990,7 +990,7 @@ export async function saveAnswersAction(
       await saveAnswer(studentId, questionId, {
         id: Number.isInteger(existing) && existing > 0 ? existing : undefined,
         value_text: textRaw || false,
-        option_id: optionRaw ? Number(optionRaw) : false,
+        option_id: relationalId(optionRaw) ?? false,
       })
       saved += 1
     } catch (cause) {

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+import { relationalId } from '@/lib/form-values'
 import { createClass, updateClass } from '@/lib/odoo/models/school'
 
 export interface ClassFormState {
@@ -87,8 +88,12 @@ function collect(form: FormData): {
 
   for (const field of RELATIONAL_FIELDS) {
     if (!form.has(field)) continue
-    const raw = text(form, field)
-    values[field] = raw ? Number(raw) : false
+    const id = relationalId(text(form, field))
+    if (id === null) {
+      fieldErrors[field] = 'Choose a valid option.'
+      continue
+    }
+    values[field] = id
   }
   if (form.has('academic_year_id') && !text(form, 'academic_year_id')) {
     fieldErrors.academic_year_id = 'Choose the academic year this class belongs to.'

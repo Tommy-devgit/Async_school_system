@@ -13,7 +13,7 @@ import {
   type StaffIntake,
 } from '@/lib/odoo/models/staff'
 import { todayIso } from '@/lib/format'
-import { submitted } from '@/lib/form-values'
+import { relationalId, submitted } from '@/lib/form-values'
 
 /**
  * Every mutation here runs as the signed-in user's Odoo session. Nothing from
@@ -160,7 +160,9 @@ export async function updateStaffAction(_previous: FormState, form: FormData): P
     if (!form.has(field)) continue
     const raw = text(form, field)
     if (RELATIONAL.has(field)) {
-      values[field] = raw ? Number(raw) : false
+      const linkId = relationalId(raw)
+      if (linkId === null) fieldErrors[field] = 'Choose a valid option.'
+      else values[field] = linkId
     } else {
       values[field] = raw || false
     }

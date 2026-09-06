@@ -1,6 +1,6 @@
 /** Run: node scripts/test-form-values.mjs */
 import assert from 'node:assert/strict'
-import { submitted, submittedList } from '../lib/form-values.ts'
+import { relationalId, submitted, submittedList } from '../lib/form-values.ts'
 
 function scenario(name, run) {
   run()
@@ -76,6 +76,28 @@ scenario('submitted() would have kept only the first, which is why the pair exis
   for (const id of ['4', '7', '9']) form.append('gradeIds', id)
   assert.equal(submitted(form, ['gradeIds']).gradeIds, '4')
   assert.equal(submittedList(form, ['gradeIds']).gradeIds.length, 3)
+})
+
+scenario('a relational id parses to an integer', () => {
+  assert.equal(relationalId('42'), 42)
+})
+
+scenario('an empty relational id clears the field', () => {
+  // Odoo wants false, not null and not 0 — this is how a many2one is unset.
+  assert.equal(relationalId(''), false)
+})
+
+scenario('a non-numeric relational id is refused, not silently cleared', () => {
+  // The bug this guards: Number('abc') is NaN, NaN serialises to null, and
+  // Odoo reads null as false — so the write used to clear the relation.
+  assert.equal(relationalId('abc'), null)
+  assert.equal(relationalId('7abc'), null)
+})
+
+scenario('a relational id that is not a positive whole number is refused', () => {
+  for (const raw of ['0', '-3', '1.5', 'Infinity', 'NaN', '1e999']) {
+    assert.equal(relationalId(raw), null, `expected ${raw} to be refused`)
+  }
 })
 
 console.log('form-values: ok')

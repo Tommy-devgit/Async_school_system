@@ -62,3 +62,22 @@ export function submittedList<Field extends string>(
 
   return values
 }
+
+/**
+ * A relational id as Odoo wants it: a positive integer, or `false` to clear.
+ *
+ * The four call sites this replaces each wrote `raw ? Number(raw) : false`,
+ * which turns any non-numeric value into `NaN`. `NaN` has no JSON form, so it
+ * serialises to `null`, and Odoo reads `null` as false — the write then
+ * silently clears the relation instead of being refused. A `<select>` never
+ * posts anything but a valid id, so this only bites a submission the browser
+ * did not build; it should still be refused rather than obeyed.
+ *
+ * Returns `null` for a value that is neither a usable id nor a deliberate
+ * clear, which the caller reports as a field error.
+ */
+export function relationalId(raw: string): number | false | null {
+  if (!raw) return false
+  const parsed = Number(raw)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
