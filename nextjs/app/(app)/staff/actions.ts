@@ -8,6 +8,7 @@ import {
   createStaff,
   endResponsibility,
   setPrimaryResponsibility,
+  updateResponsibility,
   updateStaff,
   type StaffIntake,
 } from '@/lib/odoo/models/staff'
@@ -246,6 +247,61 @@ export async function addResponsibilityAction(
 
   revalidatePath(`/staff/${staffId}`)
   return { ok: 'Responsibility added.' }
+}
+
+/**
+ * Change an existing responsibility.
+ *
+ * Odoo owns every rule this touches — the unique
+ * (staff, responsibility, department, start date), the "cannot report to
+ * themselves" check, and the end-after-start constraint — and states each in
+ * its own words, so they are passed through rather than restated.
+ *
+ * An emptied optional field is written as `false`, not skipped: clearing the
+ * campus or the reporting manager has to be expressible, and Odoo reads a
+ * missing key as "leave it alone".
+ */
+export async function updateResponsibilityAction(
+  _previous: ResponsibilityState,
+  form: FormData,
+): Promise<ResponsibilityState> {
+  await requireSession()
+
+  const id = Number(text(form, 'id'))
+  const staffId = Number(text(form, 'staffId'))
+  if (!Number.isInteger(id) || id <= 0) return { error: 'That responsibility could not be identified.' }
+  if (!Number.isInteger(staffId) || staffId <= 0) return { error: 'That record could not be identified.' }
+
+  const responsibility = text(form, 'responsibility')
+  if (!responsibility) return { error: 'Choose a responsibility.' }
+
+  const startDate = text(form, 'start_date')
+  if (!startDate) return { error: 'Give the responsibility a start date.' }
+
+  const endDate = text(form, 'end_date')
+  if (endDate && endDate < startDate) {
+    // Mirrors the model's CHECK(end_date >= start_date); Odoo enforces it too.
+    return { error: 'The effective-to date cannot be before the effective-from date.' }
+  }
+
+  const campusId = Number(text(form, 'campus_id'))
+  const managerId = Number(text(form, 'manager_id'))
+
+  try {
+    await updateResponsibility(id, {
+      responsibility,
+      department: text(form, 'department') || false,
+      campus_id: Number.isInteger(campusId) && campusId > 0 ? campusId : false,
+      manager_id: Number.isInteger(managerId) && managerId > 0 ? managerId : false,
+      start_date: startDate,
+      end_date: endDate || false,
+    })
+  } catch (cause) {
+    return { error: toOdooError(cause).message }
+  }
+
+  revalidatePath(`/staff/${staffId}`)
+  return { ok: 'Responsibility updated.' }
 }
 
 /** End a responsibility. Kept as history rather than deleted — see the model. */
