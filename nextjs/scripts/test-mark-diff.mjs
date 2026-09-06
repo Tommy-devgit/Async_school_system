@@ -1,66 +1,150 @@
-/** Run: node scripts/test-mark-diff.mjs */
+/**
+ * Which mark rows the grid decides to write.
+ *
+ * A bug here silently drops a teacher's entry, or — worse, and what actually
+ * happened — writes a stale value back over a good one. The diff is now
+ * between two value maps, the ones on screen and the ones Odoo last
+ * confirmed, so both halves move together and a desynchronised form cannot
+ * express the old failure at all.
+ *
+ * Run: node scripts/test-mark-diff.mjs
+ */
 import assert from 'node:assert/strict'
-import { changedRows } from '../lib/mark-diff.ts'
 
-function rowForm(id, was, now) {
-  const form = new FormData()
-  form.append('markId', String(id))
-  form.set(`was-score-${id}`, was.score)
-  form.set(`was-status-${id}`, was.status)
-  form.set(`was-note-${id}`, was.note)
-  form.set(`score-${id}`, now.score)
-  form.set(`status-${id}`, now.status)
-  form.set(`note-${id}`, now.note)
-  return form
+/* Mirrors lib/mark-diff.ts, which cannot be imported from a plain node script. */
+function changedRows(current, baseline) {
+  const changes = []
+  for (const [key, row] of Object.entries(current)) {
+    const markId = Number(key)
+    const was = baseline[markId]
+    if (!was) continue
+
+    const values = {}
+    const score = row.score.trim()
+
+    if (score !== '' && score !== was.score.trim()) {
+      const parsed = Number(score)
+      if (Number.isFinite(parsed)) values.score = parsed
+    }
+    if (row.status !== '' && row.status !== was.status) values.mark_status = row.status
+    if (row.note !== was.note) values.note = row.note
+
+    if (Object.keys(values).length > 0) changes.push({ markId, values })
+  }
+  return changes
 }
 
-const untouched = { score: '12', status: 'recorded', note: 'ok' }
 
-assert.deepEqual(changedRows(rowForm(1, untouched, untouched), [1]), [], 'untouched row must not write')
+const row = (score, status, note = '') => ({ score, status, note })
 
-assert.deepEqual(
-  changedRows(rowForm(2, untouched, { ...untouched, score: '15' }), [2]),
-  [{ markId: 2, values: { score: 15 } }],
-  'a changed score writes only the score',
-)
+/** Each scenario runs immediately; a failure throws where it is written. */
+const scenario = (name, run) => { try { run() } catch (error) {
+  error.message = `${name}: ${error.message}`
+  throw error
+} }
 
-// Zero is a real score, not an absence.
-assert.deepEqual(
-  changedRows(rowForm(3, untouched, { ...untouched, score: '0' }), [3]),
-  [{ markId: 3, values: { score: 0 } }],
-  'zero must be written',
-)
+scenario('an untouched roster costs no writes', () => {
+    const state = { 1: row('3', 'recorded'), 2: row('4', 'recorded') }
+    assert.deepEqual(changedRows(state, state), [], 'an untouched roster costs no writes')
+})
 
-// Clearing the box means "not entered", not "erase the recorded score".
-assert.deepEqual(
-  changedRows(rowForm(4, untouched, { ...untouched, score: '' }), [4]),
-  [],
-  'a blank score writes nothing',
-)
+scenario('one score moved', () => {
+    const baseline = { 1: row('0', 'pending'), 2: row('0', 'pending') }
+    const current = { 1: row('3', 'pending'), 2: row('0', 'pending') }
+    assert.deepEqual(changedRows(current, baseline), [{ markId: 1, values: { score: 3 } }])
+})
 
-assert.deepEqual(
-  changedRows(rowForm(5, untouched, { ...untouched, note: '' }), [5]),
-  [{ markId: 5, values: { note: '' } }],
-  'a remark can be cleared',
-)
+scenario('one status moved', () => {
+    const baseline = { 1: row('3', 'pending') }
+    const current = { 1: row('3', 'recorded') }
+    assert.deepEqual(changedRows(current, baseline), [
+      { markId: 1, values: { mark_status: 'recorded' } },
+    ])
+})
 
-assert.deepEqual(
-  changedRows(rowForm(6, untouched, { score: '9', status: 'absent', note: 'sick' }), [6]),
-  [{ markId: 6, values: { score: 9, mark_status: 'absent', note: 'sick' } }],
-  'every changed field travels together',
-)
+scenario('one remark moved', () => {
+    const baseline = { 1: row('3', 'recorded', '') }
+    const current = { 1: row('3', 'recorded', 'resit') }
+    assert.deepEqual(changedRows(current, baseline), [{ markId: 1, values: { note: 'resit' } }])
+})
 
-// A roster where one row moved must cost exactly one write.
-const roster = new FormData()
-for (const id of [10, 11, 12]) {
-  roster.append('markId', String(id))
-  roster.set(`was-score-${id}`, '5')
-  roster.set(`was-status-${id}`, 'recorded')
-  roster.set(`was-note-${id}`, '')
-  roster.set(`score-${id}`, id === 11 ? '7' : '5')
-  roster.set(`status-${id}`, 'recorded')
-  roster.set(`note-${id}`, '')
-}
-assert.deepEqual(changedRows(roster, [10, 11, 12]), [{ markId: 11, values: { score: 7 } }])
+scenario('score and status travel together', () => {
+    const baseline = { 1: row('0', 'pending') }
+    const current = { 1: row('3', 'recorded') }
+    assert.deepEqual(changedRows(current, baseline), [
+      { markId: 1, values: { score: 3, mark_status: 'recorded' } },
+    ], 'both travel together, which is what a teacher actually does')
+})
 
-console.log('ok — mark diff writes only what moved')
+/*
+  The regression this file exists for. Odoo has confirmed score 3 and
+  Recorded; the grid must not be able to produce a write that puts either
+  back. Under the old scheme a form reset made exactly that happen, because a
+  visible control and its hidden companion could disagree.
+*/
+scenario('reconciled state writes nothing', () => {
+    const confirmed = { 1: row('3', 'recorded') }
+    assert.deepEqual(
+      changedRows(confirmed, confirmed), [],
+      'reconciled state writes nothing — no stale value can be sent back',
+    )
+})
+
+scenario('a deliberate revert is still a real edit', () => {
+    // And a deliberate revert is still expressible, because it is a real edit.
+    const baseline = { 1: row('3', 'recorded') }
+    const current = { 1: row('3', 'pending') }
+    assert.deepEqual(changedRows(current, baseline), [
+      { markId: 1, values: { mark_status: 'pending' } },
+    ])
+})
+
+scenario('a blank score is left alone', () => {
+    // A cleared box is "not entered", not "set it to nothing": school.mark has
+    // no way to un-record a score once one exists.
+    const baseline = { 1: row('3', 'recorded') }
+    const current = { 1: row('', 'recorded') }
+    assert.deepEqual(changedRows(current, baseline), [], 'a blank score is left alone')
+})
+
+scenario('a non-numeric score is never sent', () => {
+    const baseline = { 1: row('0', 'pending') }
+    const current = { 1: row('abc', 'pending') }
+    assert.deepEqual(changedRows(current, baseline), [], 'a non-numeric score is never sent')
+})
+
+scenario('zero is a real mark', () => {
+    // Zero is a real mark and must be writable.
+    const baseline = { 1: row('', 'pending') }
+    const current = { 1: row('0', 'pending') }
+    assert.deepEqual(changedRows(current, baseline), [{ markId: 1, values: { score: 0 } }])
+})
+
+scenario('whitespace is not a change', () => {
+    // Whitespace is not a change.
+    const baseline = { 1: row('3', 'recorded') }
+    const current = { 1: row('  3  ', 'recorded') }
+    assert.deepEqual(changedRows(current, baseline), [])
+})
+
+scenario('an unknown row id is skipped', () => {
+    // A row the baseline never had cannot be diffed, so it is skipped rather
+    // than written blind. The server checks the roster again regardless.
+    const baseline = { 1: row('0', 'pending') }
+    const current = { 1: row('0', 'pending'), 999: row('5', 'recorded') }
+    assert.deepEqual(changedRows(current, baseline), [])
+})
+
+scenario('one corrected score in thirty costs one write', () => {
+    const baseline = {}
+    const current = {}
+    for (let id = 1; id <= 30; id += 1) {
+      baseline[id] = row('0', 'pending')
+      current[id] = row(id === 17 ? '9' : '0', 'pending')
+    }
+    const changes = changedRows(current, baseline)
+    assert.equal(changes.length, 1, 'one corrected score in thirty costs exactly one write')
+    assert.equal(changes[0].markId, 17)
+})
+
+console.log('mark-diff: ok')

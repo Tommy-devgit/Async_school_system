@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useState, useRef, useCallback } from 'react'
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MarkRow } from './mark-row'
 import { saveMarksAction, type MarkListState } from '../actions'
+import type { MarkValues } from '@/lib/mark-diff'
 
 /** Percent and grade are derived and read-only, so they yield first on narrow screens. */
 const COLUMNS = [
@@ -25,13 +26,41 @@ export interface MarkListRow {
   note: string
 }
 
+/** What the teacher has typed. Percentage and grade are never in here. */
+type Entry = Record<number, MarkValues>
+/** What Odoo has confirmed, for the same rows. */
+type Derived = Record<number, { percentage: number; grade: string | false }>
+
+const entryOf = (rows: MarkListRow[]): Entry =>
+  Object.fromEntries(
+    rows.map((row) => [
+      row.id,
+      { score: row.score === null || row.score === undefined ? '' : String(row.score), status: row.status, note: row.note },
+    ]),
+  )
+
+const derivedOf = (rows: MarkListRow[]): Derived =>
+  Object.fromEntries(rows.map((row) => [row.id, { percentage: row.percentage, grade: row.grade }]))
+
 /**
- * The mark list as an auto-saving form.
+ * The mark list as an auto-saving grid.
  *
- * A roster is entered dynamically. As the teacher types, the form intercepts
- * the changes and triggers a debounced silent save. The action diffs each
- * row against the values it was rendered with and writes only what moved.
- * Scores are bounds-checked here before the round trip, and again by Odoo.
+ * **Every editable cell is controlled.** That is the whole design, and it is
+ * load-bearing rather than stylistic. The grid used to be uncontrolled inputs
+ * paired with hidden fields carrying the values the page had been rendered
+ * with, and the action diffed one against the other. React 19 resets a form
+ * once its action returns, so after a save the visible controls snapped back
+ * to the rendered values while revalidation refreshed the hidden ones — a
+ * teacher saw "Pending" on a row Odoo held as "Recorded", and the next
+ * auto-save diffed that stale control against the fresh baseline and wrote
+ * Pending back over their entry.
+ *
+ * With the values in React state there is nothing for a form reset to
+ * desynchronise, and the diff is state against state.
+ *
+ * Percentage and grade are never computed here. They come back from Odoo with
+ * every save, because they are stored computes driven by the grading scheme —
+ * and a status like `absent` clears them on purpose.
  */
 export function MarkList({
   assessmentId,
@@ -45,67 +74,104 @@ export function MarkList({
   editable: boolean
 }) {
   const [state, formAction, pending] = useActionState<MarkListState, FormData>(saveMarksAction, {})
-  
-  // Stores client-side validation errors (e.g., score > maxScore) before sending to the server
-  const [clientErrors, setClientErrors] = useState<Record<number, string>>({})
-  
-  // References needed for the auto-save mechanism
-  const formRef = useRef<HTMLFormElement>(null)
-  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
-  /**
-   * Pre-flight validation before handing off to the server action.
-   * Ensures no row has a score exceeding its max bounds.
-   */
-  function handleSubmit(form: FormData) {
-    const errors: Record<number, string> = {}
+  /** What is on screen. */
+  const [entry, setEntry] = useState<Entry>(() => entryOf(rows))
+  /** What Odoo last confirmed — the other half of the diff. */
+  const [baseline, setBaseline] = useState<Entry>(() => entryOf(rows))
+  /** Odoo's computed columns. */
+  const [derived, setDerived] = useState<Derived>(() => derivedOf(rows))
 
+  /*
+    Bounds are checked as the teacher types, not only on submit.
+
+    `requestSubmit()` runs the browser's own constraint validation first, and a
+    number above its `max` blocks the submission before the action is reached —
+    so validating only inside the action meant an out-of-range score sat there
+    with no explanation on the page at all, just a native tooltip that vanishes.
+    Odoo checks the bound again on write regardless.
+  */
+  const boundsErrors = useMemo(() => {
+    const found: Record<number, string> = {}
     for (const row of rows) {
-      const raw = String(form.get(`score-${row.id}`) ?? '').trim()
+      const raw = (entry[row.id]?.score ?? '').trim()
       if (raw === '') continue
       const score = Number(raw)
-      
-      // Client-side guard against impossible scores
       if (!Number.isFinite(score) || score < 0 || score > row.maxScore) {
-        errors[row.id] = `Score must be between 0 and ${row.maxScore}.`
+        found[row.id] = `Score must be between 0 and ${row.maxScore}.`
       }
     }
+    return found
+  }, [entry, rows])
 
-    if (Object.keys(errors).length > 0) {
-      setClientErrors(errors)
-      return // Abort server save if client validation fails
+  const formRef = useRef<HTMLFormElement>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const lastReconciled = useRef<number | undefined>(undefined)
+
+  /*
+    Reconcile against what Odoo actually stored.
+
+    Only the rows the teacher has not touched since the save are adopted: a
+    save is in flight while typing continues, and overwriting a cell somebody
+    is still editing is the same class of bug this component exists to avoid.
+  */
+  useEffect(() => {
+    if (!state.rows || state.savedAt === lastReconciled.current) return
+    lastReconciled.current = state.savedAt
+
+    const confirmed: Entry = {}
+    const columns: Derived = {}
+    for (const row of state.rows) {
+      confirmed[row.id] = { score: String(row.score ?? ''), status: row.status, note: row.note }
+      columns[row.id] = { percentage: row.percentage, grade: row.grade }
     }
 
-    setClientErrors({})
+    setDerived((previous) => ({ ...previous, ...columns }))
+    setBaseline((previous) => ({ ...previous, ...confirmed }))
+    setEntry((previous) => {
+      const next = { ...previous }
+      for (const [key, value] of Object.entries(confirmed)) {
+        const id = Number(key)
+        // Adopt Odoo's value only where the teacher has not moved on.
+        const mine = previous[id]
+        const wasSent = mine && mine.score.trim() === value.score.trim() &&
+          mine.status === value.status && mine.note === value.note
+        if (wasSent || !mine) next[id] = value
+      }
+      return next
+    })
+  }, [state.rows, state.savedAt])
+
+  const update = useCallback((markId: number, patch: Partial<MarkValues>) => {
+    setEntry((previous) => ({ ...previous, [markId]: { ...previous[markId], ...patch } }))
+  }, [])
+
+  /**
+   * Debounced auto-save: 1.2s after the last edit, so a burst of typing costs
+   * one round trip rather than one per keystroke.
+   */
+  const scheduleSave = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => formRef.current?.requestSubmit(), 1200)
+  }, [])
+
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current) }, [])
+
+  function handleSubmit(form: FormData) {
+    // An out-of-range row is already flagged on screen; nothing is sent until
+    // it is fixed, so one bad score cannot discard thirty good ones either.
+    if (Object.keys(boundsErrors).length > 0) return
+
+    form.set('current', JSON.stringify(entry))
+    form.set('baseline', JSON.stringify(baseline))
     formAction(form)
   }
 
-  /**
-   * Debounced Auto-Save Trigger
-   * 
-   * Waits 1.2 seconds after the user stops typing before triggering a silent save.
-   * This prevents spamming the server with requests on every single keystroke.
-   */
-  const handleAutoSave = useCallback(() => {
-    // Clear the previous timer if the user keeps typing
-    if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    
-    // Set a new timer
-    timeoutRef.current = setTimeout(() => {
-      formRef.current?.requestSubmit() // Programmatically trigger the form submission
-    }, 1200)
-  }, [])
-
-  // Merge client-side validation errors with Odoo's server-side refusal errors
-  const errors = Object.keys(clientErrors).length > 0 ? clientErrors : (state.rowErrors ?? {})
+  const errors = Object.keys(boundsErrors).length > 0 ? boundsErrors : (state.rowErrors ?? {})
+  const dirty = JSON.stringify(entry) !== JSON.stringify(baseline)
 
   return (
-    <form
-      action={handleSubmit}
-      ref={formRef}
-      // Event delegation: placing onChange on the form captures edits from any child input
-      onChange={editable ? handleAutoSave : undefined}
-    >
+    <form action={handleSubmit} ref={formRef} noValidate>
       <input type="hidden" name="assessmentId" value={assessmentId} />
 
       <div className="overflow-x-auto">
@@ -128,15 +194,15 @@ export function MarkList({
                 key={row.id}
                 markId={row.id}
                 student={row.student}
-                score={row.score}
                 maxScore={row.maxScore}
-                percentage={row.percentage}
-                grade={row.grade}
-                status={row.status}
-                note={row.note}
+                values={entry[row.id] ?? { score: '', status: row.status, note: row.note }}
+                percentage={derived[row.id]?.percentage ?? row.percentage}
+                grade={derived[row.id]?.grade ?? row.grade}
                 statusOptions={statusOptions}
                 editable={editable}
                 error={errors[row.id]}
+                onChange={update}
+                onCommit={scheduleSave}
               />
             ))}
           </tbody>
@@ -145,8 +211,14 @@ export function MarkList({
 
       {editable ? (
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-silver bg-paper/30 px-4 py-3">
-          <span className="text-[12px] text-stone transition-opacity">
-            {pending ? 'Saving changes…' : 'Changes save automatically'}
+          <span className="text-[12px] text-stone">
+            {Object.keys(boundsErrors).length > 0
+              ? 'Not saved — fix the rows above'
+              : pending
+                ? 'Saving changes…'
+                : dirty
+                  ? 'Unsaved changes'
+                  : 'Changes save automatically'}
           </span>
 
           {state.error ? (
@@ -155,7 +227,7 @@ export function MarkList({
             </span>
           ) : null}
 
-          {state.ok && !state.error && !pending ? (
+          {state.ok && !state.error && !pending && !dirty ? (
             <span role="status" className="text-[12px] font-medium text-action-blue">
               {state.ok}
             </span>

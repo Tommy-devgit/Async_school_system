@@ -4,19 +4,41 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
-import { changedRows } from '@/lib/mark-diff'
+import { changedRows, type MarkValues } from '@/lib/mark-diff'
 import {
   createAssessment,
+  listAssessmentMarks,
   saveMark,
   unlockAssessment,
   updateAssessment,
 } from '@/lib/odoo/models/assessment'
+
+/** What Odoo holds for one row after a save. */
+export interface SavedMarkRow {
+  id: number
+  score: number
+  status: string
+  percentage: number
+  grade: string | false
+  note: string
+}
 
 export interface MarkListState {
   error?: string
   ok?: string
   /** Odoo's refusal for one row, keyed by mark id. */
   rowErrors?: Record<number, string>
+  /**
+   * The rows as Odoo now holds them, read back after the write.
+   *
+   * The grid reconciles against these rather than assuming its own optimism
+   * was right. It is also how the percentage and the grade appear without a
+   * reload: both are computed and stored by Odoo, and a client that guessed
+   * them would eventually guess differently from the grading scheme.
+   */
+  rows?: SavedMarkRow[]
+  /** Bumped per response so the client can tell two answers apart. */
+  savedAt?: number
 }
 
 /**
@@ -36,23 +58,49 @@ export async function saveMarksAction(
   await requireSession()
 
   const assessmentId = Number(form.get('assessmentId'))
-  const markIds = form
-    .getAll('markId')
-    .map(Number)
-    .filter((id) => Number.isInteger(id) && id > 0)
+  if (!Number.isInteger(assessmentId) || assessmentId <= 0) {
+    return { error: 'That mark list could not be identified.' }
+  }
 
-  if (markIds.length === 0) return { error: 'This mark list has no rows to save.' }
+  /*
+    The grid posts its current values and the ones Odoo last confirmed, as
+    JSON. It used to post every field twice — the control and a hidden
+    companion holding the rendered value — and diff those. React 19 resets a
+    form once its action returns, which desynchronised the two halves and let
+    the next save write stale values back over a teacher's entry.
+  */
+  let current: Record<number, MarkValues> = {}
+  let baseline: Record<number, MarkValues> = {}
+  try {
+    current = JSON.parse(String(form.get('current') ?? '{}'))
+    baseline = JSON.parse(String(form.get('baseline') ?? '{}'))
+  } catch {
+    return { error: 'That change could not be read. Reload and try again.' }
+  }
+
+  /*
+    The maximum each row is marked out of comes from Odoo, not from the
+    browser: a hand-posted maximum would otherwise widen its own bound. Odoo
+    checks the score against `max_score` again regardless.
+  */
+  const roster = await listAssessmentMarks(assessmentId)
+  const allowed = new Map(roster.rows.map((row) => [row.id, row]))
 
   const rowErrors: Record<number, string> = {}
-  const changes = changedRows(form, markIds).filter(({ markId, values }) => {
-    const max = Number(form.get(`max-${markId}`))
+  const changes = changedRows(current, baseline).filter(({ markId, values }) => {
+    const row = allowed.get(markId)
+    if (!row) {
+      // Not on this assessment's roster — refuse rather than write it.
+      rowErrors[markId] = 'That row is not part of this mark list.'
+      return false
+    }
     if (values.score === undefined) return true
     if (!Number.isFinite(values.score) || values.score < 0) {
       rowErrors[markId] = 'Enter a score of zero or more.'
       return false
     }
-    if (Number.isFinite(max) && values.score > max) {
-      rowErrors[markId] = `Score cannot be greater than ${max}.`
+    if (values.score > row.max_score) {
+      rowErrors[markId] = `Score cannot be greater than ${row.max_score}.`
       return false
     }
     return true
@@ -60,8 +108,8 @@ export async function saveMarksAction(
 
   if (changes.length === 0) {
     return Object.keys(rowErrors).length > 0
-      ? { rowErrors, error: 'Nothing saved — fix the rows above.' }
-      : { ok: 'No changes to save.' }
+      ? { rowErrors, error: 'Nothing saved — fix the rows above.', savedAt: Date.now() }
+      : { ok: 'No changes to save.', savedAt: Date.now() }
   }
 
   const results = await Promise.allSettled(
@@ -81,18 +129,35 @@ export async function saveMarksAction(
   // Rows rejected before the write are already out of `changes`, so only the
   // refusals from Odoo come off the count.
   const saved = changes.length - refused
-  if (Number.isInteger(assessmentId) && assessmentId > 0) {
-    revalidatePath(`/assessments/${assessmentId}`)
-  }
+
+  /*
+    Read the roster back. This is the only honest way to show a percentage or
+    a grade: both are computed and stored by Odoo from the grading scheme, and
+    a status like `absent` clears them deliberately. Returning what Odoo holds
+    also lets the grid reconcile instead of trusting its own optimism.
+  */
+  const after = await listAssessmentMarks(assessmentId)
+  const rows: SavedMarkRow[] = after.rows.map((row) => ({
+    id: row.id,
+    score: row.score,
+    status: String(row.mark_status || ''),
+    percentage: row.percentage,
+    grade: row.grade,
+    note: row.note === false ? '' : String(row.note ?? ''),
+  }))
+
+  revalidatePath(`/assessments/${assessmentId}`)
 
   if (Object.keys(rowErrors).length > 0) {
     return {
       rowErrors,
+      rows,
+      savedAt: Date.now(),
       error: saved > 0 ? `Saved ${saved}. The rows above were refused.` : undefined,
     }
   }
 
-  return { ok: `Saved ${saved} ${saved === 1 ? 'mark' : 'marks'}.` }
+  return { ok: `Saved ${saved} ${saved === 1 ? 'mark' : 'marks'}.`, rows, savedAt: Date.now() }
 }
 
 export interface AssessmentFormState {
