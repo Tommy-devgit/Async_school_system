@@ -228,7 +228,10 @@ class SchoolAttendance(models.Model):
 
 class SchoolAttendanceRoster(models.TransientModel):
     """Take attendance for one class and date: generates the roster from
-    active enrollments effective on that date, then opens it for marking."""
+    active enrollments effective on that date, then opens it for marking.
+
+    Daily attendance is the homeroom teacher's job — subject teachers record
+    subject/period attendance instead, and the registrar can do either."""
     _name = 'school.attendance.roster'
     _description = 'Take Attendance'
 
@@ -254,6 +257,17 @@ class SchoolAttendanceRoster(models.TransientModel):
 
     def action_generate(self):
         self.ensure_one()
+        # env.su already means "record rules do not apply", so the guard follows it
+        # rather than second-guessing it: this is a friendlier message for the rule
+        # below, not a second policy.
+        if not self.env.su \
+                and self.class_id.homeroom_teacher_id.user_id != self.env.user \
+                and not self.env.user.has_group('school_management.group_school_registrar'):
+            raise ValidationError(
+                'Daily attendance for %s is taken by its homeroom teacher (%s). '
+                'Ask them or the registrar to record it.'
+                % (self.class_id.display_name,
+                   self.class_id.homeroom_teacher_id.name or 'none assigned yet'))
         Attendance = self.env['school.attendance']
         placements = self.env['school.enrollment.placement'].search([
             ('class_id', '=', self.class_id.id),

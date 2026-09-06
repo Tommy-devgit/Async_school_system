@@ -225,11 +225,31 @@
         <field name="domain_force">[(1, '=', 1)]</field>
     </record>
 
+    <!-- Reading and recording are deliberately split. A subject teacher still -->
+    <!-- sees the daily attendance of the classes they teach, but only the      -->
+    <!-- homeroom teacher of the class may record or correct it.                -->
     <record id="rule_attendance_own_classes_teacher" model="ir.rule">
-        <field name="name">Attendance: own classes only — Teacher</field>
+        <field name="name">Attendance: read own classes — Teacher</field>
         <field name="model_id" ref="model_school_attendance"/>
         <field name="groups" eval="[(4, ref('school_management.group_school_teacher'))]"/>
         <field name="domain_force">['|', ('teacher_assignment_id.teacher_id.user_id', '=', user.id), ('class_id', 'in', user.school_taught_class_ids.ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_attendance_record_daily_homeroom_teacher" model="ir.rule">
+        <field name="name">Attendance: record daily for own homeroom class, subject for own assignment — Teacher</field>
+        <field name="model_id" ref="model_school_attendance"/>
+        <field name="groups" eval="[(4, ref('school_management.group_school_teacher'))]"/>
+        <field name="domain_force">['|',
+            '&amp;', ('attendance_type', '=', 'daily'), ('class_id.homeroom_teacher_id.user_id', '=', user.id),
+            '&amp;', ('attendance_type', '=', 'subject'), ('teacher_assignment_id.teacher_id.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
     </record>
 
     <!-- ══════════════════════════════════════════════════════════════════════ -->
