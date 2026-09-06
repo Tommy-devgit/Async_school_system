@@ -465,4 +465,54 @@
         <field name="perm_unlink" eval="False"/>
     </record>
 
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!--  REPORT CARDS                                                         -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!--
+        school.report.card had no record rule at all, while every teacher held
+        read access to it. So a teacher could read every report card in the
+        school — the same marks they are refused one at a time by
+        rule_mark_own_class_subject_teacher, handed over in aggregate. Measured
+        before this: a teacher saw 0 of 21 marks and 8 of 8 report cards.
+
+        The scoped rule uses the same expression as students, enrolments and
+        curriculum lines, because school.report.card carries the same stored
+        class_id and there is no reason for this model to be scoped differently
+        from every other class-bound record.
+
+        The three "all records" rules are not decoration. group_school_admin
+        implies group_school_teacher, so a teacher-only rule would leave the
+        administrator scoped to the classes they teach — none — and reading
+        nothing at all. Rules for the groups admin also implies are what put it
+        back; the MARKS section above pairs them for the same reason.
+    -->
+
+    <record id="rule_report_card_all_registrar" model="ir.rule">
+        <field name="name">Report cards: all records — Registrar</field>
+        <field name="model_id" ref="model_school_report_card"/>
+        <field name="groups" eval="[(4, ref('school_management.group_school_registrar'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <record id="rule_report_card_all_director" model="ir.rule">
+        <field name="name">Report cards: all records — Director</field>
+        <field name="model_id" ref="model_school_report_card"/>
+        <field name="groups" eval="[(4, ref('school_management.group_school_director'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <record id="rule_report_card_all_exam_officer" model="ir.rule">
+        <field name="name">Report cards: all records — Exam Officer</field>
+        <field name="model_id" ref="model_school_report_card"/>
+        <field name="groups" eval="[(4, ref('school_management.group_school_exam_officer'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <record id="rule_report_card_own_class_teacher" model="ir.rule">
+        <field name="name">Report cards: own classes only — Teacher</field>
+        <field name="model_id" ref="model_school_report_card"/>
+        <field name="groups" eval="[(4, ref('school_management.group_school_teacher'))]"/>
+        <field name="domain_force">[('class_id', 'in', user.school_taught_class_ids.ids)]</field>
+    </record>
+
 </odoo>

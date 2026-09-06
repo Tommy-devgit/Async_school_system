@@ -327,6 +327,82 @@ class TestRecordScopeSurvives(AuthorizationCase):
         self.assertEqual(self.perms('school.mark', 'director'), 'R')
         self.as_role('director', 'school.mark').search([])
 
+    # ── report cards ──────────────────────────────────────────────────────
+
+    def _report_card(self, student):
+        """A minimal report card for one student, bypassing the generator.
+
+        The wizard computes marks, ranks and a snapshot; none of that is what
+        these two tests are about, and going through it would make them fail
+        for reasons unrelated to who may read the row.
+        """
+        # Built rather than borrowed from whatever the database happens to
+        # hold: reusing an existing scheme left this creation path running only
+        # on a clean CI database, where it failed on field names no local run
+        # ever reached.
+        scheme = self.env['school.grading.scheme'].search([('name', '=', 'AUTH Scheme')], limit=1)
+        if not scheme:
+            scheme = self.env['school.grading.scheme'].create({
+                'name': 'AUTH Scheme',
+                'pass_percentage': 50.0,
+                'band_ids': [(0, 0, {
+                    'name': 'A', 'minimum_percentage': 0.0, 'maximum_percentage': 100.0,
+                })],
+            })
+        enrollment = self.env['school.enrollment'].search(
+            [('student_id', '=', student.id)], limit=1)
+        self.assertTrue(enrollment, 'the fixture student has an enrolment to report on')
+        return self.env['school.report.card'].create({
+            'name': 'AUTH RC %s' % student.id,
+            'student_id': student.id,
+            'enrollment_id': enrollment.id,
+            'term_id': self.term.id,
+            'grading_scheme_id': scheme.id,
+            'version': 1,
+            # Odoo's required check treats an empty dict as missing.
+            'result_snapshot': {'subjects': []},
+        })
+
+    def test_a_teacher_reads_report_cards_only_for_classes_they_teach(self):
+        """A report card is the marks a teacher may not read, in aggregate.
+
+        `rule_mark_own_class_subject_teacher` scopes school.mark to the
+        teacher's own assignments, and school.report.card had no rule at all —
+        so the same figures were readable school-wide from the other model.
+        Measured against a demo database before the fix: a teacher saw 0 of 21
+        marks and 8 of 8 report cards.
+        """
+        own = self._report_card(self.student_own)
+        other = self._report_card(self.student_other)
+
+        visible = self.as_role('teacher', 'school.report.card').search(
+            [('id', 'in', (own | other).ids)])
+
+        self.assertEqual(
+            visible, own,
+            'a teacher reads the report cards of classes they teach, and no others')
+
+        # And not by direct id either, which is the reading a domain filter misses.
+        with self.assertRaises(AccessError):
+            self.as_role('teacher', 'school.report.card').browse(other.id).read(['name'])
+
+    def test_the_roles_that_must_see_every_report_card_still_do(self):
+        """The other half of the rule, and the half that is easy to break.
+
+        group_school_admin implies group_school_teacher, so adding a
+        teacher-scoped rule without matching all-records rules for the groups
+        admin also implies would have left the administrator reading nothing —
+        scoped to the classes they teach, which is none.
+        """
+        own = self._report_card(self.student_own)
+        other = self._report_card(self.student_other)
+        both = (own | other)
+
+        for role in ('admin', 'registrar', 'director', 'exam_officer'):
+            visible = self.as_role(role, 'school.report.card').search([('id', 'in', both.ids)])
+            self.assertEqual(
+                visible, both,
+                '%s must still read every report card' % role)
 
 class TestRegistrarTimetable(AuthorizationCase):
     """Registrar -> day builder -> action_build -> school.class.schedule.
