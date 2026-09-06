@@ -9,6 +9,7 @@ import {
   addResponsibilityAction,
   endResponsibilityAction,
   setPrimaryResponsibilityAction,
+  updateResponsibilityAction,
   type ResponsibilityState,
 } from '../actions'
 
@@ -53,6 +54,12 @@ export function Responsibilities({
   canWrite: boolean
 }) {
   const [adding, setAdding] = useState(false)
+  /** The row currently open for editing, if any. Only one at a time. */
+  const [editing, setEditing] = useState<number | null>(null)
+  const [editState, editAction, editPending] = useActionState<ResponsibilityState, FormData>(
+    updateResponsibilityAction,
+    {},
+  )
   const [addState, addAction, addPending] = useActionState<ResponsibilityState, FormData>(
     addResponsibilityAction,
     {},
@@ -66,8 +73,8 @@ export function Responsibilities({
     {},
   )
 
-  const feedback = addState.error ?? endState.error ?? primaryState.error
-  const success = addState.ok ?? endState.ok ?? primaryState.ok
+  const feedback = addState.error ?? endState.error ?? primaryState.error ?? editState.error
+  const success = addState.ok ?? endState.ok ?? primaryState.ok ?? editState.ok
   const activeCount = rows.filter((row) => row.active).length
 
   return (
@@ -133,6 +140,15 @@ export function Responsibilities({
               <Cell>
                 {canWrite && row.active ? (
                   <span className="flex justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(editing === row.id ? null : row.id)}
+                      aria-expanded={editing === row.id}
+                      title="Change this responsibility's details"
+                      className="rounded-[8px] px-2 py-1 text-[11px] text-slate hover:bg-paper hover:text-graphite"
+                    >
+                      {editing === row.id ? 'Close' : 'Edit'}
+                    </button>
                     {row.is_primary ? null : (
                       <form action={primaryAction}>
                         <input type="hidden" name="id" value={row.id} />
@@ -165,6 +181,130 @@ export function Responsibilities({
           ))}
         </DataTable>
       )}
+
+      {/*
+        The edit form sits outside the table rather than inside a cell: it needs
+        the full width, and a form element nested in a row would not be valid
+        table markup. Only one row is open at a time.
+      */}
+      {canWrite && editing !== null && rows.some((row) => row.id === editing) ? (
+        <div className="border-t border-silver bg-paper/40 p-6">
+          {(() => {
+            const row = rows.find((item) => item.id === editing)!
+            return (
+              <form action={editAction} className="space-y-3" key={row.id}>
+                <p className="text-[13px] font-medium text-graphite">
+                  Editing {formatSelection(row.responsibility)}
+                </p>
+                <input type="hidden" name="id" value={row.id} />
+                <input type="hidden" name="staffId" value={staffId} />
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-medium text-graphite">
+                      Responsibility <span className="text-danger">*</span>
+                    </span>
+                    <select
+                      name="responsibility"
+                      required
+                      defaultValue={row.responsibility}
+                      className={INPUT_CLASS}
+                    >
+                      {responsibilities.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-medium text-graphite">
+                      Department
+                    </span>
+                    <select name="department" defaultValue={row.department || ''} className={INPUT_CLASS}>
+                      <option value="">Same as staff record</option>
+                      {departments.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-medium text-graphite">
+                      Effective from <span className="text-danger">*</span>
+                    </span>
+                    <input
+                      type="date"
+                      name="start_date"
+                      required
+                      defaultValue={row.start_date || ''}
+                      className={INPUT_CLASS}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-medium text-graphite">
+                      Effective to
+                    </span>
+                    <input
+                      type="date"
+                      name="end_date"
+                      defaultValue={row.end_date || ''}
+                      className={INPUT_CLASS}
+                    />
+                  </label>
+                  {campuses.length ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-[12px] font-medium text-graphite">Campus</span>
+                      <select name="campus_id" defaultValue={campusValue(row, campuses)} className={INPUT_CLASS}>
+                        <option value="">None</option>
+                        {campuses.map((campus) => (
+                          <option key={campus.id} value={campus.id}>
+                            {campus.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {managers.length ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-[12px] font-medium text-graphite">
+                        Reporting manager
+                      </span>
+                      <select name="manager_id" defaultValue={managerValue(row, managers)} className={INPUT_CLASS}>
+                        <option value="">None</option>
+                        {managers.map((manager) => (
+                          <option key={manager.id} value={manager.id}>
+                            {manager.staff_id ? `${manager.name} · ${manager.staff_id}` : manager.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+                <p className="text-[11px] text-stone">
+                  Whether this is the primary responsibility is changed with “Make primary”, because
+                  Odoo allows only one at a time and clears the previous one.
+                </p>
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm" pending={editPending}>
+                    {editPending ? 'Saving…' : 'Save changes'}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(null)}
+                    className={cx(
+                      'rounded-[9999px] border border-silver px-3.5 py-1.5 text-[12px]',
+                      'hover:bg-paper',
+                    )}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )
+          })()}
+        </div>
+      ) : null}
 
       {canWrite ? (
         <div className="border-t border-silver p-6 pt-4">
@@ -272,4 +412,26 @@ export function Responsibilities({
       ) : null}
     </div>
   )
+}
+
+/*
+  The rows arrive with campus and manager as display names, because that is
+  what the table shows. Matching the name back to an id keeps the edit form
+  from having to refetch, and an unmatched name simply preselects nothing
+  rather than silently picking the wrong record.
+*/
+function campusValue(
+  row: ResponsibilityItem,
+  campuses: Array<{ id: number; name: string }>,
+): string {
+  const match = campuses.find((campus) => campus.name === row.campus)
+  return match ? String(match.id) : ''
+}
+
+function managerValue(
+  row: ResponsibilityItem,
+  managers: Array<{ id: number; name: string; staff_id: string | false }>,
+): string {
+  const match = managers.find((manager) => manager.name === row.manager)
+  return match ? String(match.id) : ''
 }

@@ -398,6 +398,32 @@ export function addResponsibility(
 }
 
 /**
+ * Change an existing responsibility.
+ *
+ * Add, End and Make-primary were all reachable and this was not, so a
+ * responsibility recorded with the wrong department, campus, reporting manager
+ * or start date could only be ended and replaced — which loses the history the
+ * `mail.thread` mixin exists to keep, and leaves a misleading ended row behind.
+ *
+ * `is_primary` is deliberately not writable here. It carries a uniqueness
+ * constraint across the staff member's other rows, so it keeps its own action
+ * which clears the previous primary first.
+ */
+export function updateResponsibility(
+  id: number,
+  values: {
+    responsibility?: string
+    department?: string | false
+    campus_id?: number | false
+    manager_id?: number | false
+    start_date?: string
+    end_date?: string | false
+  },
+): Promise<boolean> {
+  return write('school.staff.responsibility', [id], values)
+}
+
+/**
  * End a responsibility rather than delete it.
  *
  * The model is `mail.thread`-tracked precisely so the history survives, and
