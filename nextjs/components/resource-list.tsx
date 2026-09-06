@@ -19,6 +19,9 @@ import type { IconName } from '@/components/icons'
 import { pluralise } from '@/lib/format'
 import { listHrefs, parseListQuery, type ListQuery, type RawSearchParams } from '@/lib/list-query'
 import { toOdooError } from '@/lib/odoo/errors'
+import { hasAccess } from '@/lib/odoo/client'
+import { getRemoval, permissionFor, type RemovalKey } from '@/lib/odoo/removals'
+import { BulkRemove, RowSelect } from '@/components/bulk-remove'
 import type { Page } from '@/lib/odoo/types'
 
 /**
@@ -60,6 +63,8 @@ export async function ResourceList<T extends { id: number }>({
   emptyAction,
   rowHref,
   caption,
+  removable,
+  rowLabel,
 }: {
   title: string
   /** Overrides the default "n records visible to you". */
@@ -82,6 +87,14 @@ export async function ResourceList<T extends { id: number }>({
   /** Makes the first cell a link to the record. */
   rowHref?: (row: T) => string
   caption?: string
+  /**
+   * Lets rows be selected and removed, using the server-side allowlist in
+   * lib/odoo/removals.ts. The screen names a key, never a model, and the
+   * control appears only where Odoo's `has_access` already says yes.
+   */
+  removable?: RemovalKey
+  /** What to call a row in the confirmation — defaults to the record's name. */
+  rowLabel?: (row: T) => string
 }) {
   const params = await searchParams
   const query = parseListQuery(params, {
@@ -107,6 +120,21 @@ export async function ResourceList<T extends { id: number }>({
 
   const hasToolbar = Boolean(search) || filters.length > 0
 
+  /*
+    Whether to offer removal at all. `has_access` asks Odoo about the model, so
+    the answer is the real one for this user rather than a guess from their
+    role — and the server action re-checks by doing the operation, which is the
+    only check that decides anything.
+  */
+  const removal = removable ? getRemoval(removable) : null
+  const canRemove = removal
+    ? await hasAccess(removal.model, permissionFor(removal.mode)).catch(() => false)
+    : false
+
+  const selectColumn: Column[] = canRemove
+    ? [{ key: '__select', label: '', header: <span className="sr-only">Select</span> }]
+    : []
+
   const tableColumns: Column[] = columns.map((column) => ({
     key: column.key,
     label: column.label,
@@ -130,6 +158,48 @@ export async function ResourceList<T extends { id: number }>({
       />
     ) : undefined,
   }))
+
+  const rowsTable = (
+        <DataTable columns={[...selectColumn, ...tableColumns]} caption={caption ?? title}>
+          {result.rows.map((row) => (
+            <Row key={row.id} href={rowHref?.(row)}>
+              {canRemove ? (
+                <Cell>
+                  <RowSelect
+                    id={row.id}
+                    label={rowLabel?.(row) ?? String((row as { name?: unknown }).name ?? row.id)}
+                  />
+                </Cell>
+              ) : null}
+              {columns.map((column) => (
+                <Cell
+                  key={column.key}
+                  numeric={column.numeric}
+                  hideBelow={column.hideBelow}
+                  strong={column === columns[0]}
+                >
+                  {/*
+                    The link lives here, on the first cell, rather than in
+                    each screen's own render function.
+
+                    `rowHref` used to be handed to `Row` and quietly dropped —
+                    it only ever chose a hover colour — so a screen that
+                    relied on it alone had rows that went nowhere at all, and
+                    the fifteen screens that worked did so because each had
+                    built the same RowLink by hand. One mechanism, so a new
+                    list cannot be born dead.
+                  */}
+                  {column === columns[0] && rowHref ? (
+                    <RowLink href={rowHref(row)}>{column.render(row)}</RowLink>
+                  ) : (
+                    column.render(row)
+                  )}
+                </Cell>
+              ))}
+            </Row>
+          ))}
+        </DataTable>
+  )
 
   return (
     <>
@@ -189,38 +259,23 @@ export async function ResourceList<T extends { id: number }>({
               action={emptyAction}
             />
           )
+        ) : canRemove && removal ? (
+          /*
+            The table goes inside the selection form, and nothing else does:
+            the toolbar above holds a search field of its own, and a form
+            inside a form is not valid markup.
+          */
+          <BulkRemove
+            resource={removable!}
+            mode={removal.mode}
+            noun={removal.noun}
+            plural={removal.plural}
+            note={removal.note}
+          >
+            {rowsTable}
+          </BulkRemove>
         ) : (
-          <DataTable columns={tableColumns} caption={caption ?? title}>
-            {result.rows.map((row) => (
-              <Row key={row.id} href={rowHref?.(row)}>
-                {columns.map((column) => (
-                  <Cell
-                    key={column.key}
-                    numeric={column.numeric}
-                    hideBelow={column.hideBelow}
-                    strong={column === columns[0]}
-                  >
-                    {/*
-                      The link lives here, on the first cell, rather than in
-                      each screen's own render function.
-
-                      `rowHref` used to be handed to `Row` and quietly dropped —
-                      it only ever chose a hover colour — so a screen that
-                      relied on it alone had rows that went nowhere at all, and
-                      the fifteen screens that worked did so because each had
-                      built the same RowLink by hand. One mechanism, so a new
-                      list cannot be born dead.
-                    */}
-                    {column === columns[0] && rowHref ? (
-                      <RowLink href={rowHref(row)}>{column.render(row)}</RowLink>
-                    ) : (
-                      column.render(row)
-                    )}
-                  </Cell>
-                ))}
-              </Row>
-            ))}
-          </DataTable>
+          rowsTable
         )}
 
         <Pagination

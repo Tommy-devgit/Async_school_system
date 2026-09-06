@@ -27,6 +27,19 @@ async function total(page) {
 
 const rowCount = (page) => page.locator('main tbody tr').count()
 
+/*
+  The first cell that carries data — one per row.
+
+  A list the signed-in user may remove from leads with a selection checkbox, so
+  `td:first-child` is the checkbox on some screens and the name on others.
+  Working out the offset once per page keeps these checks pointed at the same
+  column on both, and keeps one cell per row rather than all of them.
+*/
+async function firstDataCell(page) {
+  const selectable = (await page.locator('main tbody tr td input[name="id"]').count()) > 0
+  return page.locator(`main tbody tr td:nth-child(${selectable ? 2 : 1})`)
+}
+
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
@@ -90,7 +103,7 @@ await page.goto(`${BASE}/students`, { waitUntil: 'domcontentloaded' })
 const allStudents = await total(page)
 check('students load', allStudents !== null && allStudents > 0, `total=${allStudents}`)
 
-const firstName = (await page.locator('main tbody tr td').first().textContent())?.trim() ?? ''
+const firstName = (await (await firstDataCell(page)).first().textContent())?.trim() ?? ''
 const term = firstName.split(' ')[0]
 await page.fill('main input[type="search"]', term)
 // Wait for the query to land in the URL rather than for a fixed interval:
@@ -131,9 +144,9 @@ if (options.length) {
 
 console.log('\nsorting is a server query')
 await page.goto(`${BASE}/students?sort=name:asc`, { waitUntil: 'domcontentloaded' })
-const ascending = await page.locator('main tbody tr td:first-child').allTextContents()
+const ascending = await (await firstDataCell(page)).allTextContents()
 await page.goto(`${BASE}/students?sort=name:desc`, { waitUntil: 'domcontentloaded' })
-const descending = await page.locator('main tbody tr td:first-child').allTextContents()
+const descending = await (await firstDataCell(page)).allTextContents()
 check('descending differs from ascending', ascending.join('|') !== descending.join('|'))
 check(
   'descending really is reversed',
@@ -152,12 +165,12 @@ check('an unknown sort field is ignored, not passed on', (await rowCount(page)) 
 console.log('\npaging')
 await page.goto(`${BASE}/staff`, { waitUntil: 'domcontentloaded' })
 const staffTotal = await total(page)
-const firstPage = await page.locator('main tbody tr td:first-child').allTextContents()
+const firstPage = await (await firstDataCell(page)).allTextContents()
 if ((staffTotal ?? 0) > 25) {
   check('page one is capped at the page size', firstPage.length === 25, `rows=${firstPage.length}`)
   await page.click('main a[aria-label="Next page"]')
   await page.waitForURL('**/staff?page=2', { timeout: 20_000 })
-  const secondPage = await page.locator('main tbody tr td:first-child').allTextContents()
+  const secondPage = await (await firstDataCell(page)).allTextContents()
   check('page two holds different rows', firstPage[0] !== secondPage[0], `${firstPage[0]} vs ${secondPage[0]}`)
   check('the total is unchanged by paging', (await total(page)) === staffTotal)
   check('previous is available', (await page.locator('main a[aria-label="Previous page"]').count()) === 1)
@@ -219,7 +232,7 @@ for (const url of LINKED_LISTS) {
   }
 
   // The link belongs in the first cell, which is what a reader clicks.
-  const linked = await page.locator('main tbody tr td:first-child a').count()
+  const linked = await (await firstDataCell(page)).locator('a').count()
   check(
     `${url.padEnd(18)} rows link to the record`,
     linked === rows,

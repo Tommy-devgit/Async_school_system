@@ -44,6 +44,7 @@ export default async function PromotionPage({ searchParams }: PageProps<'/promot
         })
       }
       rowHref={(row) => `/promotion/${row.id}`}
+      removable="promotion"
       emptyTitle="No promotion batches visible"
       emptyHint="A batch advances one grade from one academic year to the next."
       emptyAction={

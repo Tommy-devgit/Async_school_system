@@ -39,6 +39,7 @@ export default async function SubjectsPage({ searchParams }: PageProps<'/subject
         })
       }
       rowHref={(row) => `/subjects/${row.id}/edit`}
+      removable="subject"
       emptyTitle="No subjects visible"
       columns={[
         { key: 'name', label: 'Subject', sortField: 'name', render: (row) => row.name },

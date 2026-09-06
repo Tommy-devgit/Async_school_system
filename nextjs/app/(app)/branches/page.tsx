@@ -45,6 +45,7 @@ export default async function BranchesPage({ searchParams }: PageProps<'/branche
         ) : undefined
       }
       rowHref={(row) => `/branches/${row.id}`}
+      removable="branch"
       emptyTitle="No branches yet"
       emptyHint="A single-site school does not need one; add a branch when there is more than one campus to tell apart."
       columns={[

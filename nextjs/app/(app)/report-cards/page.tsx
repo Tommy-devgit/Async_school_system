@@ -65,6 +65,7 @@ export default async function ReportCardsPage({ searchParams }: PageProps<'/repo
         })
       }
       rowHref={(row) => `/report-cards/${row.id}`}
+      removable="reportCard"
       emptyTitle="No report cards visible"
       emptyHint="Generated from published marks by an Exam Officer."
       columns={[

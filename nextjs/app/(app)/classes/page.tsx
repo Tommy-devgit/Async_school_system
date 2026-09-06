@@ -49,6 +49,7 @@ export default async function ClassesPage({ searchParams }: PageProps<'/classes'
         })
       }
       rowHref={(row) => `/classes/${row.id}`}
+      removable="classes"
       emptyTitle="No classes visible"
       emptyHint="Classes are created per academic year from a grade and a section."
       columns={[

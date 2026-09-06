@@ -26,8 +26,18 @@ import { chromium } from 'playwright-core'
 const BASE = process.argv[2] ?? 'http://localhost:3100'
 const PASSWORD = process.env.E2E_PASSWORD
 
+/*
+  Each role needs its own login, and the administrator needs E2E_ADMIN_LOGIN
+  specifically.
+
+  This used to fall back to E2E_LOGIN, which is the generic login every other
+  suite uses — so running them together, with E2E_LOGIN set to a registrar,
+  signed in as that registrar and checked them against the administrator's
+  expected count. The suite reported one failure and passed on its own, which
+  reads exactly like a flake and is not one.
+*/
 const ROLES = {
-  admin: process.env.E2E_ADMIN_LOGIN ?? process.env.E2E_LOGIN,
+  admin: process.env.E2E_ADMIN_LOGIN,
   director: process.env.E2E_DIRECTOR_LOGIN,
   registrar: process.env.E2E_REGISTRAR_LOGIN,
   teacher: process.env.E2E_TEACHER_LOGIN,
@@ -93,7 +103,7 @@ for (const [role, login] of Object.entries(ROLES)) {
 
   const expected = EXPECTED_COUNT[role]
   check(
-    `the sidebar offers ${expected} entries`,
+    `${role} (${login}) is offered ${expected} entries`,
     offered.length === expected,
     `got ${offered.length}: ${offered.join(' ')}`,
   )

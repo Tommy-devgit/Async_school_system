@@ -54,6 +54,7 @@ export default async function GuardiansPage({
         ) : undefined
       }
       rowHref={(row) => `/students/${m2oId(row.student_id) ?? 0}`}
+      removable="guardian"
       emptyTitle="No guardians visible"
       emptyHint="Odoo scopes this list to the records your role may see."
       emptyAction={

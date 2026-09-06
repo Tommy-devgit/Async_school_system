@@ -45,6 +45,7 @@ export default async function TeachersPage({ searchParams }: PageProps<'/teacher
           </LinkButton>
         ) : undefined
       }
+      removable="teacher"
       emptyTitle="No teacher profiles visible"
       emptyHint="A teacher profile is created when a staff member takes a teaching responsibility."
       columns={[

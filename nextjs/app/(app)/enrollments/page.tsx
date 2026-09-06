@@ -42,6 +42,7 @@ export default async function EnrollmentsPage({ searchParams }: PageProps<'/enro
         })
       }
       rowHref={(row) => `/enrollments/${row.id}`}
+      removable="enrollment"
       emptyTitle="No enrolments visible"
       emptyHint="Teachers see enrolments for their own classes only. Approving a registration creates the first one."
       columns={[

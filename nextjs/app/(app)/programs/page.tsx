@@ -48,6 +48,7 @@ export default async function ProgramsPage({ searchParams }: PageProps<'/program
         })
       }
       rowHref={(row) => `/programs/${row.id}`}
+      removable="program"
       emptyTitle="No programs visible"
       columns={[
         {

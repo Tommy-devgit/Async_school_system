@@ -72,6 +72,7 @@ export default async function CurriculumPage({ searchParams }: PageProps<'/curri
         shown the same list without a door into a form Odoo would refuse.
       */
       rowHref={canEdit ? (row) => `/curriculum/${row.id}/edit` : undefined}
+      removable="curriculum"
       emptyTitle="No curriculum lines match"
       emptyHint="Curriculum lines are created for a whole class at once, on Configuration."
       columns={[

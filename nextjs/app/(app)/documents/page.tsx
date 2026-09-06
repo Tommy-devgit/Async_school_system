@@ -41,6 +41,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<'/docume
         })
       }
       rowHref={(row) => `/documents/${row.id}`}
+      removable="document"
       emptyTitle="No documents visible"
       emptyHint="Document access is restricted to the registrar and HR."
       columns={[
