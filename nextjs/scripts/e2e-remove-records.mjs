@@ -77,6 +77,13 @@ assertWritable(ODOO, 'the record removal suite')
 const sid = await odooLogin(LOGIN)
 const STAMP = Date.now()
 const created = []
+/*
+  Anything this suite archives, so the `finally` can put it back even if a
+  check throws first. An earlier version restored inline and left a staff
+  member archived when a wait timed out — a destructive suite has to undo its
+  work from somewhere that always runs.
+*/
+const archived = []
 
 /** A program nobody else will match, so the suite can only ever select its own. */
 async function makeProgram(suffix) {
@@ -163,7 +170,10 @@ try {
   await page.locator('button:has-text("Delete selected")').click()
   await page.locator('button:has-text("Yes, delete")').waitFor({ state: 'visible', timeout: 10_000 })
   await page.locator('button:has-text("Yes, delete")').click()
-  await page.waitForTimeout(3000)
+  await page.getByText(/Deleted \d+ |cannot be completed/i).first().waitFor({
+    state: 'visible',
+    timeout: 60_000,
+  })
 
   check('the first selected program is gone', !(await exists('school.program', a)))
   check('the second selected program is gone', !(await exists('school.program', b)))
@@ -172,6 +182,102 @@ try {
   const after = (await page.locator('main').textContent()) ?? ''
   check('it says what it did', /Deleted 2 programs/i.test(after), after.slice(0, 0) || undefined)
   check('no traceback', !/Traceback|odoo\.exceptions/i.test(after))
+
+  /* ------------------- a delete Odoo refuses offers archive instead --- */
+
+  /*
+    The case that started this: deleting a staff member who has a daily status
+    row fails on the foreign key, and Odoo's own message ends "How about
+    archiving the record instead?" — a good suggestion the screen previously
+    gave no way to take.
+
+    A staff member is used rather than a made-up model because that is the
+    record the reference actually exists on.
+  */
+  console.log('\nwhen Odoo refuses a delete, archive is offered instead')
+
+  /*
+    Finding the record needs a session that may read school.staff.daily.status,
+    which the registrar may not — only HR and the administrator hold that ACL
+    row. So an admin session is borrowed to *locate* a suitable staff member;
+    everything the suite then asserts happens as the registrar, in the browser.
+  */
+  let referenced = []
+  const ADMIN = process.env.E2E_ADMIN_LOGIN
+  if (ADMIN) {
+    const adminSid = await odooLogin(ADMIN)
+    referenced = await odoo(adminSid, 'school.staff.daily.status', 'search_read', [], {
+      fields: ['staff_id'],
+      limit: 1,
+    })
+  }
+
+  if (!ADMIN) {
+    console.log('  SKIPPED — set E2E_ADMIN_LOGIN to find a staff member with a daily status')
+  } else if (referenced.length === 0) {
+    console.log('  SKIPPED — no staff member in this database is referenced by a daily status')
+  } else {
+    const staffId = referenced[0].staff_id[0]
+    const staffName = referenced[0].staff_id[1]
+
+    await page.goto(`${BASE}/staff?q=${encodeURIComponent(staffName)}`, {
+      waitUntil: 'domcontentloaded',
+    })
+    await page.locator('main h1').first().waitFor({ timeout: 30_000 })
+
+    const box = page.locator(`main tbody input[name="id"][value="${staffId}"]`)
+    if ((await box.count()) === 0) {
+      console.log(`  SKIPPED — ${staffName} is not on the first page of results`)
+    } else {
+      await box.check()
+      await page.waitForTimeout(300)
+
+      // Archive is offered up front, not only after a failure.
+      const bar = (await page.locator('main').textContent()) ?? ''
+      check('both operations are offered on an archivable model', /Delete selected/i.test(bar) && /Archive selected/i.test(bar))
+
+      await page.locator('button:has-text("Delete selected")').click()
+      await page.locator('button:has-text("Yes, delete")').waitFor({ state: 'visible', timeout: 10_000 })
+      await page.locator('button:has-text("Yes, delete")').click()
+
+      /*
+        Waited for by its text, not slept through and not by role: the round
+        trip goes to Odoo, fails on the constraint and comes back, which takes
+        longer than any fixed wait worth writing — and `[role="alert"]` alone
+        matches field errors already on the page, so it returned immediately
+        and read a screen that had not changed yet.
+      */
+      await page
+        .getByText(/cannot be completed|another model is using/i)
+        .first()
+        .waitFor({ state: 'visible', timeout: 60_000 })
+      const refused = (await page.locator('main').textContent()) ?? ''
+      check('Odoo refused the delete', /cannot be completed|another model is using/i.test(refused))
+      check('the staff member still exists', await exists('school.staff', staffId))
+      check('and archiving is offered in response', /Archive .* instead/i.test(refused))
+      check('with no traceback', !/Traceback|psycopg2/i.test(refused))
+
+      /*
+        The selection has to survive the refusal, or the offer is empty. React
+        19 resets the form when the action returns, so this ticked box was
+        being cleared and "archive instead" submitted nothing.
+      */
+      check(
+        'the selection survived the refusal',
+        await page.locator(`main tbody input[name="id"][value="${staffId}"]`).isChecked(),
+      )
+
+      // Take the offer, then put the record back.
+      await page.locator('button:has-text("instead")').click()
+      await page.locator('button:has-text("Yes, archive")').waitFor({ state: 'visible', timeout: 10_000 })
+      await page.locator('button:has-text("Yes, archive")').click()
+      await page.getByText(/Archived \d+ /i).first().waitFor({ state: 'visible', timeout: 60_000 })
+
+      archived.push(['school.staff', staffId])
+      check('the record was not destroyed', await existsIncludingArchived('school.staff', staffId))
+      check('and it left the active list', !(await exists('school.staff', staffId)))
+    }
+  }
 
   /* ----------------------------------- archive, where delete is refused --- */
 
@@ -201,16 +307,18 @@ try {
     await page.locator('button:has-text("Archive selected")').click()
     await page.locator('button:has-text("Yes, archive")').waitFor({ state: 'visible', timeout: 10_000 })
     await page.locator('button:has-text("Yes, archive")').click()
-    await page.waitForTimeout(3000)
+    await page.getByText(/Archived \d+ |cannot be completed/i).first().waitFor({
+      state: 'visible',
+      timeout: 60_000,
+    })
 
+    archived.push(['school.student', studentId])
     check('the record was not destroyed', await existsIncludingArchived('school.student', studentId))
     check('but it is gone from the list', !(await exists('school.student', studentId)))
     const archivedText = (await page.locator('main').textContent()) ?? ''
     check('it says archived, and says it can come back', /Archived 1 student.*restored/is.test(archivedText))
 
-    // Put it back — this suite does not leave the school's data changed.
-    await odoo(sid, 'school.student', 'write', [[studentId], { active: true }])
-    check('the student was restored', await exists('school.student', studentId), `#${studentId}`)
+    // Putting it back happens in the `finally`, so a later failure cannot skip it.
   }
 
   /* --------------------------------- a role without the permission --- */
@@ -259,6 +367,23 @@ try {
   }
 } finally {
   console.log('\ncleaning up')
+
+  /*
+    Un-archive before anything else, and from here rather than inline.
+
+    Restoring inline meant a later check throwing left the record archived —
+    which it did, repeatedly, until the counts made it obvious. A suite that
+    hides records has to put them back from somewhere that always runs.
+  */
+  for (const [model, id] of archived) {
+    try {
+      await odoo(sid, model, 'write', [[id], { active: true }])
+      check(`${model} #${id} was restored`, await exists(model, id))
+    } catch (error) {
+      console.log(`  note: could not restore ${model} ${id} — ${error.message}`)
+    }
+  }
+
   for (const id of created) {
     try {
       if (await exists('school.program', id)) {

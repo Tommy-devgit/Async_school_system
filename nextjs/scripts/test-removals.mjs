@@ -9,6 +9,10 @@
  *     appears for nobody, or worse appears and always fails.
  *   - An entry marked `archive` for a model that *can* be deleted. The screen
  *     then quietly does something other than what the user asked for.
+ *   - An entry that archives a model with no `active` field. This one shipped:
+ *     `school.document` was marked archive, has no `active`, and every use of
+ *     the control would have raised. The addon is read here so it cannot
+ *     happen twice.
  *
  * Read as text rather than imported, because removals.ts is `server-only`.
  *
@@ -22,6 +26,22 @@ const csv = readFileSync(
   new URL('../../addons/school_management/security/ir.model.access.csv', import.meta.url),
   'utf8',
 )
+
+/* ------------------------------------ which models actually carry `active` --- */
+
+import { readdirSync } from 'node:fs'
+
+const modelsDir = new URL('../../addons/school_management/models/', import.meta.url)
+const hasActive = new Map()
+for (const file of readdirSync(modelsDir).filter((f) => f.endsWith('.py'))) {
+  const python = readFileSync(new URL(file, modelsDir), 'utf8')
+  // Each model's body runs from its _name to the next class in the file.
+  for (const match of python.matchAll(/_name\s*=\s*'([^']+)'/g)) {
+    const next = python.indexOf('\nclass ', match.index)
+    const body = python.slice(match.index, next > 0 ? next : undefined)
+    hasActive.set(match[1], /^\s+active\s*=\s*fields\.Boolean/m.test(body))
+  }
+}
 
 /* --------------------------------- who may unlink each model, per the ACL --- */
 
@@ -42,8 +62,13 @@ for (const line of lines) {
 /* ------------------------------------------- what removals.ts declares --- */
 
 const entries = [...source.matchAll(
-  /(\w+):\s*\{\s*model:\s*'([^']+)',\s*mode:\s*'(delete|archive)'/g,
-)].map(([, key, model, mode]) => ({ key, model, mode }))
+  /(\w+):\s*\{\s*model:\s*'([^']+)',\s*mode:\s*'(delete|archive)'([\s\S]*?)\n  \},/g,
+)].map(([, key, model, mode, rest]) => ({
+  key,
+  model,
+  mode,
+  archivable: /archivable:\s*true/.test(rest),
+}))
 
 assert.ok(entries.length >= 15, `only found ${entries.length} entries — did the shape change?`)
 
@@ -74,6 +99,25 @@ for (const { key, model, mode } of entries) {
 }
 
 console.log(`  ok — ${deletes} delete and ${archives} archive entries all match the ACL`)
+
+/* --------------------------- archiving needs a field to write, not just a mode --- */
+
+let archivableCount = 0
+for (const { key, model, mode, archivable } of entries) {
+  if (mode !== 'archive' && !archivable) continue
+  archivableCount += 1
+  assert.ok(
+    hasActive.has(model),
+    `${key} names ${model}, which no model file defines`,
+  )
+  assert.equal(
+    hasActive.get(model),
+    true,
+    `${key} archives ${model}, which has no \`active\` field — the write would raise`,
+  )
+}
+
+console.log(`  ok — all ${archivableCount} archivable entries have an \`active\` field to write`)
 
 /* ----------------------------------------------- the keys are the surface --- */
 

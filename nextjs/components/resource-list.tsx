@@ -236,7 +236,25 @@ export async function ResourceList<T extends { id: number }>({
           </Toolbar>
         ) : null}
 
-        {result.rows.length === 0 ? (
+        {/*
+          The selection form wraps the empty state as well as the table.
+
+          Removing the last row a filter matched empties the list, and when the
+          form only wrapped the table it unmounted at that moment — taking the
+          "Archived 1 staff member" confirmation with it and leaving the user on
+          "Nothing matches those filters", with nothing to say the removal had
+          worked at all.
+        */}
+        {canRemove && removal ? (
+          <BulkRemove
+            resource={removable!}
+            mode={removal.mode}
+            archivable={removal.archivable}
+            noun={removal.noun}
+            plural={removal.plural}
+            note={removal.note}
+          >
+            {result.rows.length === 0 ? (
           hrefs.isNarrowed ? (
             <EmptyState
               icon="search"
@@ -259,21 +277,33 @@ export async function ResourceList<T extends { id: number }>({
               action={emptyAction}
             />
           )
-        ) : canRemove && removal ? (
-          /*
-            The table goes inside the selection form, and nothing else does:
-            the toolbar above holds a search field of its own, and a form
-            inside a form is not valid markup.
-          */
-          <BulkRemove
-            resource={removable!}
-            mode={removal.mode}
-            noun={removal.noun}
-            plural={removal.plural}
-            note={removal.note}
-          >
-            {rowsTable}
+            ) : (
+              rowsTable
+            )}
           </BulkRemove>
+        ) : result.rows.length === 0 ? (
+          hrefs.isNarrowed ? (
+            <EmptyState
+              icon="search"
+              title="Nothing matches those filters"
+              hint="Try a different term, or clear the filters to see the full list."
+              action={
+                <Link
+                  href={hrefs.cleared}
+                  className="rounded-[9999px] border border-silver bg-white px-4 py-2 text-[13px] hover:bg-paper"
+                >
+                  Clear filters
+                </Link>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={emptyIcon ?? icon}
+              title={emptyTitle}
+              hint={emptyHint}
+              action={emptyAction}
+            />
+          )
         ) : (
           rowsTable
         )}

@@ -23,7 +23,35 @@ import { getRemoval } from '@/lib/odoo/removals'
 export interface RemoveState {
   error?: string
   ok?: string
+  /**
+   * Set when a delete was refused *only* because something else still points
+   * at the record, and the model can be archived instead. The bar then offers
+   * that, rather than leaving the user with Odoo's suggestion and no way to
+   * take it.
+   */
+  offerArchive?: boolean
+  /**
+   * The ids that were submitted, echoed back on a refusal.
+   *
+   * React 19 resets the form once the action returns, which clears every
+   * checkbox — so without this the selection is gone the moment a removal is
+   * refused, and the "archive instead" it offers has nothing to act on.
+   */
+  ids?: number[]
 }
+
+/*
+  Odoo's message when a foreign key is in the way. It names the model and the
+  constraint and ends with "How about archiving the record instead?" — which is
+  a good suggestion the user previously had no way to act on.
+
+  Matched loosely on purpose: the wording carries a model name and a field
+  name that differ every time, and a stricter pattern would quietly stop
+  matching after a version bump. The worst case of a false positive is
+  offering an archive that Odoo then refuses in its own words.
+*/
+const REFERENCED_BY_ANOTHER_RECORD =
+  /another model is using the record|referenced by|foreign key|archiving the record instead/i
 
 /** More than this in one click is almost certainly a mis-click, not an intent. */
 const MAX_AT_ONCE = 100
@@ -37,6 +65,18 @@ export async function removeRecordsAction(
   const removal = getRemoval(String(form.get('resource') ?? ''))
   if (!removal) return { error: 'That action is not available.' }
 
+  /*
+    The form may ask for archive on a model whose default is delete, but only
+    where the allowlist says archiving is possible. Anything else falls back to
+    the entry's own mode — the browser cannot talk this into an operation the
+    server has not already agreed to.
+  */
+  const asked = String(form.get('mode') ?? '')
+  const mode =
+    asked === 'archive' && (removal.mode === 'archive' || removal.archivable)
+      ? 'archive'
+      : removal.mode
+
   const ids = form
     .getAll('id')
     .map(Number)
@@ -44,7 +84,10 @@ export async function removeRecordsAction(
 
   if (ids.length === 0) return { error: 'Nothing was selected.' }
   if (ids.length > MAX_AT_ONCE) {
-    return { error: `Too many at once — ${MAX_AT_ONCE} is the limit. Narrow the list first.` }
+    return {
+      error: `Too many at once — ${MAX_AT_ONCE} is the limit. Narrow the list first.`,
+      ids: [...new Set(ids)],
+    }
   }
 
   /*
@@ -53,24 +96,29 @@ export async function removeRecordsAction(
     must not remove anything.
   */
   if (String(form.get('confirmed') ?? '') !== 'yes') {
-    return { error: 'That removal was not confirmed.' }
+    return { error: 'That removal was not confirmed.', ids: [...new Set(ids)] }
   }
 
   const unique = [...new Set(ids)]
 
   try {
-    if (removal.mode === 'delete') {
+    if (mode === 'delete') {
       await callKw<boolean>(removal.model, 'unlink', [unique])
     } else {
       await write(removal.model, unique, { active: false })
     }
   } catch (cause) {
-    /*
-      Odoo's own words. The useful ones here are its foreign-key refusals —
-      "you cannot delete this record because it is referenced by…" — which name
-      what is in the way, and are far more use than anything invented here.
-    */
-    return { error: toOdooError(cause).message }
+    // Odoo's own words: its refusals name what is in the way, which is far
+    // more use than anything invented here.
+    const message = toOdooError(cause).message
+    return {
+      error: message,
+      ids: unique,
+      offerArchive:
+        mode === 'delete' &&
+        Boolean(removal.archivable) &&
+        REFERENCED_BY_ANOTHER_RECORD.test(message),
+    }
   }
 
   for (const path of removal.revalidate) revalidatePath(path)
@@ -79,7 +127,7 @@ export async function removeRecordsAction(
   const noun = count === 1 ? removal.noun : removal.plural
   return {
     ok:
-      removal.mode === 'delete'
+      mode === 'delete'
         ? `Deleted ${count} ${noun}.`
         : `Archived ${count} ${noun}. They can be restored.`,
   }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { createContext, useActionState, useContext, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Icon } from '@/components/icons'
 import { cx } from '@/components/ui/primitives'
@@ -22,9 +22,26 @@ import { removeRecordsAction, type RemoveState } from '@/app/(app)/remove-action
  * Odoo's `has_access` already said yes. It is a courtesy, not a boundary —
  * Odoo re-checks on every call and answers in its own words when it refuses.
  */
+
+/**
+ * What to put back in the boxes after the action replies.
+ *
+ * React 19 resets the form once an action returns — including when it returns
+ * a refusal — which clears every checkbox. Without restoring them, a refused
+ * delete silently empties the selection, and the "archive instead" the refusal
+ * offers submits nothing at all. The rows are rebuilt on each reply so the
+ * restored `defaultChecked` actually lands; see `useFormResponse` in
+ * components/ui/form for why a changed default is not enough on its own.
+ */
+const SelectionContext = createContext<{ keep: ReadonlySet<number>; response: number }>({
+  keep: new Set<number>(),
+  response: 0,
+})
+
 export function BulkRemove({
   resource,
   mode,
+  archivable = false,
   noun,
   plural,
   note,
@@ -32,6 +49,8 @@ export function BulkRemove({
 }: {
   resource: string
   mode: 'delete' | 'archive'
+  /** The model also has `active`, so archiving is offered alongside deleting. */
+  archivable?: boolean
   noun: string
   plural: string
   note?: string
@@ -43,7 +62,8 @@ export function BulkRemove({
   )
   const formRef = useRef<HTMLFormElement>(null)
   const [selected, setSelected] = useState(0)
-  const [asking, setAsking] = useState(false)
+  /** Which removal is being confirmed, or null while nothing is being asked. */
+  const [intent, setIntent] = useState<'delete' | 'archive' | null>(null)
 
   /*
     Counted off the DOM rather than tracked in state, so the count cannot
@@ -63,33 +83,69 @@ export function BulkRemove({
     reply's identity so two identical successes are still two replies.
   */
   const [seen, setSeen] = useState(state)
+  const [response, setResponse] = useState(0)
   if (seen !== state) {
     setSeen(state)
+    setResponse(response + 1)
     if (state.ok) {
-      setAsking(false)
+      setIntent(null)
       setSelected(0)
+    } else {
+      // A refusal keeps the selection, so it can be acted on differently.
+      setSelected(state.ids?.length ?? 0)
     }
   }
 
-  const verb = mode === 'delete' ? 'Delete' : 'Archive'
+  /*
+    Memoised on the reply rather than rebuilt every render.
+
+    `RowSelect` is uncontrolled and carries `defaultChecked`, so it should only
+    re-render when there is genuinely something new to put back. A context
+    value rebuilt on every render would re-render every checkbox on the page
+    each time anything in the bar moved.
+  */
+  const selection = useMemo(
+    () => ({ keep: new Set(state.ok ? [] : (state.ids ?? [])), response }),
+    [state.ok, state.ids, response],
+  )
+
   const subject = selected === 1 ? noun : plural
+  const these = selected === 1 ? 'this' : 'these'
 
   return (
     <form ref={formRef} action={formAction} onChange={recount}>
       <input type="hidden" name="resource" value={resource} />
-      {/* Only the confirming submit sends this; see the server action. */}
-      {asking ? <input type="hidden" name="confirmed" value="yes" /> : null}
+      {/* Only the confirming submit sends these; see the server action. */}
+      {intent ? <input type="hidden" name="confirmed" value="yes" /> : null}
+      {intent ? <input type="hidden" name="mode" value={intent} /> : null}
 
-      {children}
+      <SelectionContext value={selection}>{children}</SelectionContext>
 
       {state.error ? (
-        <p
+        <div
           role="alert"
           className="mx-6 mb-4 flex gap-2.5 rounded-[8px] bg-danger-bg px-3.5 py-3 text-[13px] text-danger"
         >
           <Icon name="alert" size={16} className="mt-px shrink-0" />
-          <span className="min-w-0">{state.error}</span>
-        </p>
+          <div className="min-w-0">
+            <p>{state.error}</p>
+
+            {/*
+              Odoo ends that refusal with "How about archiving the record
+              instead?" — so offer it, rather than leaving a good suggestion
+              the user has no way to take.
+            */}
+            {state.offerArchive ? (
+              <button
+                type="button"
+                onClick={() => setIntent('archive')}
+                className="mt-2 rounded-[9999px] border border-danger px-3.5 py-1 text-[12px] font-medium hover:bg-white"
+              >
+                Archive {selected === 1 ? 'it' : 'them'} instead
+              </button>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
       {state.ok && !state.error ? (
@@ -107,49 +163,87 @@ export function BulkRemove({
             {selected} {subject} selected
           </span>
 
-          {asking ? (
+          {/*
+            The trigger stays put and goes disabled while the question is up,
+            and the confirmation is appended after it.
+
+            They used to be replaced by it, which put "Yes, archive" exactly
+            where "Archive selected" had been — so one physical click could arm
+            and confirm, because React re-renders during the click and the
+            mouse-up landed on the new submit button. For a destructive action
+            that is not a layout detail.
+          */}
+          {mode === 'delete' ? (
+          <button
+            type="button"
+            disabled={Boolean(intent)}
+            onClick={() => setIntent('delete')}
+            className={cx(
+              'rounded-[9999px] border border-danger px-4 py-1.5 text-[13px] text-danger',
+              intent ? 'opacity-40' : 'hover:bg-danger-bg',
+            )}
+          >
+            Delete selected
+          </button>
+          ) : null}
+
+          {/*
+            Archive is offered up front on any model that can be archived, not
+            only after a delete has failed. Odoo refuses to delete a record
+            another one points at, and that is the common case for exactly the
+            records somebody wants gone.
+          */}
+          {mode === 'archive' || archivable ? (
+          <button
+            type="button"
+            disabled={Boolean(intent)}
+            onClick={() => setIntent('archive')}
+            className={cx(
+              'rounded-[9999px] border border-silver px-4 py-1.5 text-[13px]',
+              intent ? 'opacity-40' : 'hover:bg-paper',
+            )}
+          >
+            Archive selected
+          </button>
+          ) : null}
+
+          {intent ? (
             <>
               <span className="text-[12px] text-danger">
-                {mode === 'delete'
-                  ? `Permanently delete ${selected === 1 ? 'this' : 'these'} ${subject}?`
-                  : `Archive ${selected === 1 ? 'this' : 'these'} ${subject}?`}
+                {intent === 'delete'
+                  ? `Permanently delete ${these} ${subject}?`
+                  : `Archive ${these} ${subject}?`}
               </span>
               <button
                 type="submit"
                 disabled={pending}
                 className={cx(
                   'rounded-[9999px] px-4 py-1.5 text-[13px] font-medium text-white disabled:opacity-50',
-                  mode === 'delete' ? 'bg-danger' : 'bg-ink',
+                  intent === 'delete' ? 'bg-danger' : 'bg-ink',
                 )}
               >
-                {pending ? `${verb.slice(0, -1)}ing…` : `Yes, ${verb.toLowerCase()}`}
+                {pending
+                  ? intent === 'delete'
+                    ? 'Deleting…'
+                    : 'Archiving…'
+                  : intent === 'delete'
+                    ? 'Yes, delete'
+                    : 'Yes, archive'}
               </button>
               <button
                 type="button"
-                onClick={() => setAsking(false)}
+                onClick={() => setIntent(null)}
                 className="rounded-[9999px] border border-silver px-4 py-1.5 text-[13px] hover:bg-paper"
               >
                 Keep {selected === 1 ? 'it' : 'them'}
               </button>
             </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAsking(true)}
-              className={cx(
-                'rounded-[9999px] border px-4 py-1.5 text-[13px]',
-                mode === 'delete'
-                  ? 'border-danger text-danger hover:bg-danger-bg'
-                  : 'border-silver hover:bg-paper',
-              )}
-            >
-              {verb} selected
-            </button>
-          )}
+          ) : null}
 
-          {note && !asking ? (
+          {note && !intent ? (
             <span className="basis-full text-[11px] leading-relaxed text-stone">{note}</span>
           ) : null}
+
         </div>
       ) : null}
     </form>
@@ -158,11 +252,16 @@ export function BulkRemove({
 
 /** The checkbox in a row, named so the selection is the submission. */
 export function RowSelect({ id, label }: { id: number; label: string }) {
+  const { keep, response } = useContext(SelectionContext)
+
   return (
     <input
+      // Rebuilt on each reply so a restored tick survives the form reset.
+      key={`${id}-${response}`}
       type="checkbox"
       name="id"
       value={id}
+      defaultChecked={keep.has(id)}
       aria-label={`Select ${label}`}
       className="h-4 w-4 rounded border-silver text-action-blue focus:ring-action-blue"
     />

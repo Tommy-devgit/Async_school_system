@@ -38,6 +38,16 @@ export interface Removal {
   revalidate: string[]
   /** Shown next to the control, for a mode that needs explaining. */
   note?: string
+  /**
+   * The model also carries `active`, so archiving is available as well.
+   *
+   * This is not a nicety. Odoo refuses to delete a record another model still
+   * points at — a staff member with a daily status row, a class with students
+   * — and its own message ends "How about archiving the record instead?".
+   * Offering delete alone means offering an operation that fails on exactly
+   * the records somebody most wants gone.
+   */
+  archivable?: true
 }
 
 /*
@@ -54,15 +64,15 @@ export const REMOVALS = {
     note:
       'Students are archived rather than deleted. Enrolments, marks, report cards and attendance all hang off the record, and a school has to keep them. An archived student leaves every list and can be restored.',
   },
-  document: {
-    model: 'school.document',
-    mode: 'archive',
-    noun: 'document',
-    plural: 'documents',
-    revalidate: ['/documents'],
-    note:
-      'Documents are archived rather than deleted. A verified document is evidence that a requirement was met, so removing it outright would rewrite the registration record.',
-  },
+  /*
+    `school.document` is deliberately absent.
+
+    The ACL grants unlink to nobody, and the model has no `active` field
+    either — so there is no removal operation to offer, and an Archive control
+    would have written a field that does not exist. Removing a document is a
+    thing this application genuinely cannot do, and saying nothing is more
+    honest than offering a button that raises.
+  */
 
   staff: {
     model: 'school.staff',
@@ -70,6 +80,7 @@ export const REMOVALS = {
     noun: 'staff member',
     plural: 'staff members',
     revalidate: ['/staff', '/teachers'],
+    archivable: true,
   },
   teacher: {
     model: 'school.teacher',
@@ -91,6 +102,7 @@ export const REMOVALS = {
     noun: 'enrolment',
     plural: 'enrolments',
     revalidate: ['/enrollments', '/students'],
+    archivable: true,
   },
   program: {
     model: 'school.program',
@@ -98,6 +110,7 @@ export const REMOVALS = {
     noun: 'program',
     plural: 'programs',
     revalidate: ['/programs', '/programs/calendar'],
+    archivable: true,
   },
   announcement: {
     model: 'school.announcement',
@@ -105,6 +118,7 @@ export const REMOVALS = {
     noun: 'announcement',
     plural: 'announcements',
     revalidate: ['/announcements'],
+    archivable: true,
   },
   assessment: {
     model: 'school.assessment',
@@ -119,6 +133,7 @@ export const REMOVALS = {
     noun: 'curriculum line',
     plural: 'curriculum lines',
     revalidate: ['/curriculum', '/configuration'],
+    archivable: true,
   },
   classes: {
     model: 'school.class',
@@ -126,6 +141,7 @@ export const REMOVALS = {
     noun: 'class',
     plural: 'classes',
     revalidate: ['/classes', '/configuration'],
+    archivable: true,
   },
   subject: {
     model: 'school.subject',
@@ -133,6 +149,7 @@ export const REMOVALS = {
     noun: 'subject',
     plural: 'subjects',
     revalidate: ['/subjects', '/curriculum'],
+    archivable: true,
   },
   room: {
     model: 'school.room',
@@ -140,6 +157,7 @@ export const REMOVALS = {
     noun: 'room',
     plural: 'rooms',
     revalidate: ['/rooms'],
+    archivable: true,
   },
   branch: {
     model: 'school.campus',
@@ -147,6 +165,7 @@ export const REMOVALS = {
     noun: 'campus',
     plural: 'campuses',
     revalidate: ['/branches'],
+    archivable: true,
   },
   academicYear: {
     model: 'school.academic.year',
@@ -154,6 +173,7 @@ export const REMOVALS = {
     noun: 'academic year',
     plural: 'academic years',
     revalidate: ['/academic-years', '/configuration'],
+    archivable: true,
   },
   schedule: {
     model: 'school.class.schedule',
@@ -161,6 +181,7 @@ export const REMOVALS = {
     noun: 'timetable slot',
     plural: 'timetable slots',
     revalidate: ['/schedule', '/schedule/grid'],
+    archivable: true,
   },
   reportCard: {
     model: 'school.report.card',
