@@ -276,6 +276,18 @@ try {
       archived.push(['school.staff', staffId])
       check('the record was not destroyed', await existsIncludingArchived('school.staff', staffId))
       check('and it left the active list', !(await exists('school.staff', staffId)))
+
+      /*
+        Put it back now rather than only in the `finally`.
+
+        The staff record this archives belongs to the teacher the read-only
+        checks below sign in as, and an archived staff record takes their
+        classes with it — so leaving it archived until the end made this suite
+        fail its own later assertion. The `finally` still restores it, which is
+        harmless to do twice and is what covers a failure before this line.
+      */
+      await odoo(sid, 'school.staff', 'write', [[staffId], { active: true }])
+      check('and it comes back when restored', await exists('school.staff', staffId))
     }
   }
 

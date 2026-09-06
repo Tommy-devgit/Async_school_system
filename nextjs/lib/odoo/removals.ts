@@ -183,13 +183,16 @@ export const REMOVALS = {
     revalidate: ['/schedule', '/schedule/grid'],
     archivable: true,
   },
-  reportCard: {
-    model: 'school.report.card',
-    mode: 'delete',
-    noun: 'report card',
-    plural: 'report cards',
-    revalidate: ['/report-cards'],
-  },
+  /*
+    `school.report.card` is deliberately absent, for the same reason as
+    school.document above but one layer down.
+
+    The ACL grants unlink to the administrator and the registrar, so the ACL
+    alone says a Delete control belongs here — but the model overrides unlink
+    to raise unconditionally ("Report card versions are permanent academic
+    records"), and there is no `active` field to archive instead. The
+    permission is real and the operation is not.
+  */
   promotion: {
     model: 'school.promotion.batch',
     mode: 'delete',

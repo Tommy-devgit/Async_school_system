@@ -11,8 +11,11 @@
  *     then quietly does something other than what the user asked for.
  *   - An entry that archives a model with no `active` field. This one shipped:
  *     `school.document` was marked archive, has no `active`, and every use of
- *     the control would have raised. The addon is read here so it cannot
- *     happen twice.
+ *     the control would have raised.
+ *   - An entry that deletes a model whose `unlink` raises unconditionally.
+ *     `school.report.card` grants unlink in the ACL and then refuses it in
+ *     Python — "Report card versions are permanent academic records" — so the
+ *     ACL alone is not enough to decide this. The addon is read here for both.
  *
  * Read as text rather than imported, because removals.ts is `server-only`.
  *
@@ -33,6 +36,7 @@ import { readdirSync } from 'node:fs'
 
 const modelsDir = new URL('../../addons/school_management/models/', import.meta.url)
 const hasActive = new Map()
+const alwaysRefusesUnlink = new Map()
 for (const file of readdirSync(modelsDir).filter((f) => f.endsWith('.py'))) {
   const python = readFileSync(new URL(file, modelsDir), 'utf8')
   // Each model's body runs from its _name to the next class in the file.
@@ -40,6 +44,17 @@ for (const file of readdirSync(modelsDir).filter((f) => f.endsWith('.py'))) {
     const next = python.indexOf('\nclass ', match.index)
     const body = python.slice(match.index, next > 0 ? next : undefined)
     hasActive.set(match[1], /^\s+active\s*=\s*fields\.Boolean/m.test(body))
+
+    /*
+      An `unlink` that raises before testing anything can never succeed,
+      whatever the ACL grants. A guarded one — `if any(...): raise` — refuses
+      only some records, which is a real delete with a fallback and not this.
+    */
+    const unlink = /\n    def unlink\(self\):\n((?:        .*\n|\n)*)/.exec(body)
+    if (unlink) {
+      const first = unlink[1].split('\n').map((line) => line.trim()).filter(Boolean)[0] ?? ''
+      alwaysRefusesUnlink.set(match[1], first.startsWith('raise'))
+    }
   }
 }
 
@@ -87,6 +102,11 @@ for (const { key, model, mode } of entries) {
       mayUnlink.get(model),
       true,
       `${key} offers Delete but no group holds unlink on ${model} — it would always fail`,
+    )
+    assert.notEqual(
+      alwaysRefusesUnlink.get(model),
+      true,
+      `${key} offers Delete but ${model}.unlink() raises unconditionally — the ACL grants it and the model refuses it`,
     )
   } else {
     archives += 1
