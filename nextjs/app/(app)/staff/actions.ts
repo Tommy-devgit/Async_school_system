@@ -13,7 +13,7 @@ import {
   type StaffIntake,
 } from '@/lib/odoo/models/staff'
 import { todayIso } from '@/lib/format'
-import { relationalId, submitted } from '@/lib/form-values'
+import { isEmail, relationalId, submitted } from '@/lib/form-values'
 
 /**
  * Every mutation here runs as the signed-in user's Odoo session. Nothing from
@@ -66,6 +66,14 @@ function validateIntake(form: FormData): { values?: StaffIntake; fieldErrors?: R
   // Mirrors school.staff._check_fayda_id purely so the user hears sooner.
   if (fayda && !/^[0-9]{16}$/.test(fayda)) {
     fieldErrors.fayda_id = 'Fayda ID must be exactly 16 digits.'
+  }
+
+  // school.staff.email is a plain Char with no constraint, and Odoo turns it
+  // into res.users.login when a teaching login is provisioned. type="email" on
+  // the input is the only other check, and it stops at the browser.
+  const email = text(form, 'email')
+  if (email && !isEmail(email)) {
+    fieldErrors.email = 'Enter a valid email address.'
   }
 
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
@@ -159,7 +167,9 @@ export async function updateStaffAction(_previous: FormState, form: FormData): P
     // see date_of_birth never posts it, so the write never mentions it.
     if (!form.has(field)) continue
     const raw = text(form, field)
-    if (RELATIONAL.has(field)) {
+    if (field === 'email' && raw && !isEmail(raw)) {
+      fieldErrors.email = 'Enter a valid email address.'
+    } else if (RELATIONAL.has(field)) {
       const linkId = relationalId(raw)
       if (linkId === null) fieldErrors[field] = 'Choose a valid option.'
       else values[field] = linkId

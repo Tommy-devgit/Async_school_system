@@ -1,6 +1,6 @@
 /** Run: node scripts/test-form-values.mjs */
 import assert from 'node:assert/strict'
-import { relationalId, submitted, submittedList } from '../lib/form-values.ts'
+import { isEmail, relationalId, submitted, submittedList } from '../lib/form-values.ts'
 
 function scenario(name, run) {
   run()
@@ -97,6 +97,18 @@ scenario('a non-numeric relational id is refused, not silently cleared', () => {
 scenario('a relational id that is not a positive whole number is refused', () => {
   for (const raw of ['0', '-3', '1.5', 'Infinity', 'NaN', '1e999']) {
     assert.equal(relationalId(raw), null, `expected ${raw} to be refused`)
+  }
+})
+
+scenario('an ordinary address passes', () => {
+  for (const value of ['t@example.et', 'first.last+tag@sub.example.co.uk']) {
+    assert.equal(isEmail(value), true, value)
+  }
+})
+
+scenario('a malformed address is refused before it becomes a login', () => {
+  for (const value of ['plain', 'no@domain', 'two@@at.et', 'sp ace@example.et', '@example.et']) {
+    assert.equal(isEmail(value), false, value)
   }
 })
 

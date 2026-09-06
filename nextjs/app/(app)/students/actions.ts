@@ -8,7 +8,7 @@ import { readOne } from '@/lib/odoo/client'
 import { toOdooError } from '@/lib/odoo/errors'
 // Aliased: this module already has its own `submitted` over the student
 // intake fields, which the shared helper should eventually replace.
-import { relationalId, submitted as submittedFields } from '@/lib/form-values'
+import { isEmail, relationalId, submitted as submittedFields } from '@/lib/form-values'
 
 import { saveAnswer } from '@/lib/odoo/models/registration'
 import {
@@ -206,10 +206,7 @@ export async function registerStudentAction(
   }
 
   // Email format
-  if (
-    email &&
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-  ) {
+  if (email && !isEmail(email)) {
     fieldErrors.email =
       'Enter a valid email address.'
   }
@@ -901,7 +898,7 @@ export async function updateStudentAction(
   }
 
   const email = text(form, 'email')
-  if (form.has('email') && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (form.has('email') && email && !isEmail(email)) {
     fieldErrors.email = 'Enter a valid email address.'
   }
 

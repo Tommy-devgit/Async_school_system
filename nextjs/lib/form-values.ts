@@ -81,3 +81,19 @@ export function relationalId(raw: string): number | false | null {
   const parsed = Number(raw)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
+
+/**
+ * Whether a value is shaped like an email address.
+ *
+ * Deliberately the same shape check the browser applies to `type="email"`, and
+ * nothing more: an address is only really validated by sending to it, and a
+ * stricter pattern rejects real addresses. Its job is to stop a submission the
+ * browser did not build from reaching Odoo, which stores staff email as a plain
+ * Char with no constraint of its own and then hands it to `res.users.login`
+ * when a teaching login is provisioned.
+ *
+ * An empty value is not an error here — required-ness is the caller's call.
+ */
+export function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
