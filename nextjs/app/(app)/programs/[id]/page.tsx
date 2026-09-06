@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { formatDualDate, formatSelection } from '@/lib/format'
-import { ErrorState, PageHeader } from '@/components/ui'
+import { ErrorState, LinkButton, PageHeader } from '@/components/ui'
 import { WorkflowDetail } from '@/components/workflow-detail'
 import { hasAccess } from '@/lib/odoo/client'
 import { toOdooError } from '@/lib/odoo/errors'
@@ -36,6 +36,13 @@ export default async function ProgramDetailPage({ params }: PageProps<'/programs
       id={program.id}
       state={String(program.state || '')}
       canWrite={canWrite}
+      actions={
+        canWrite ? (
+          <LinkButton href={`/programs/${program.id}/edit`} icon="configuration" size="sm">
+            Edit
+          </LinkButton>
+        ) : null
+      }
       revalidate={[`/programs/${program.id}`, '/programs']}
       note="A cancelled program stays visible with its status rather than disappearing."
       fields={[

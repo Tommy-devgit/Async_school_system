@@ -2,7 +2,13 @@
 
 import { useActionState } from 'react'
 import { Badge, Button, Card, Cell, DataTable, EmptyState, Row, cx } from '@/components/ui'
-import { FormError, FormSuccess, INPUT_CLASS, INPUT_INVALID } from '@/components/ui/form'
+import {
+  FormError,
+  FormSuccess,
+  INPUT_CLASS,
+  INPUT_INVALID,
+  useFormResponse,
+} from '@/components/ui/form'
 import { createTermAction, updateTermAction, type TermFormState } from './actions'
 
 /**
@@ -88,6 +94,10 @@ function TermRow({
 }) {
   const [state, action, pending] = useActionState<TermFormState, FormData>(updateTermAction, {})
   const mine = state.target === String(term.id)
+
+  // Only the row that was actually refused re-seeds from the submission.
+  const prior = mine ? state.values : undefined
+  const response = useFormResponse(state)
   const formId = `term-${term.id}`
   const error = (field: string) => (mine ? state.fieldErrors?.[field] : undefined)
 
@@ -98,7 +108,7 @@ function TermRow({
           <input
             name="name"
             form={formId}
-            defaultValue={term.name}
+            defaultValue={prior?.name ?? term.name}
             aria-label="Term name"
             disabled={!canWrite}
             className={cx(INPUT_CLASS, error('name') && INPUT_INVALID)}
@@ -106,9 +116,10 @@ function TermRow({
         </Cell>
         <Cell>
           <select
+            key={`academic_year_id-${response}`}
             name="academic_year_id"
             form={formId}
-            defaultValue={term.academicYearId}
+            defaultValue={prior?.academic_year_id ?? term.academicYearId}
             aria-label="Academic year"
             disabled={!canWrite}
             className={cx(INPUT_CLASS, error('academic_year_id') && INPUT_INVALID)}
@@ -125,7 +136,7 @@ function TermRow({
             type="date"
             name="date_start"
             form={formId}
-            defaultValue={term.dateStart}
+            defaultValue={prior?.date_start ?? term.dateStart}
             aria-label="Start date"
             disabled={!canWrite}
             className={cx(INPUT_CLASS, error('date_start') && INPUT_INVALID)}
@@ -136,7 +147,7 @@ function TermRow({
             type="date"
             name="date_end"
             form={formId}
-            defaultValue={term.dateEnd}
+            defaultValue={prior?.date_end ?? term.dateEnd}
             aria-label="End date"
             disabled={!canWrite}
             className={cx(INPUT_CLASS, error('date_end') && INPUT_INVALID)}
@@ -148,7 +159,7 @@ function TermRow({
             step={1}
             name="sequence"
             form={formId}
-            defaultValue={term.sequence}
+            defaultValue={prior?.sequence ?? term.sequence}
             aria-label="Order"
             disabled={!canWrite}
             className={cx(INPUT_CLASS, error('sequence') && INPUT_INVALID)}
@@ -161,7 +172,7 @@ function TermRow({
             name="active"
             value="true"
             form={formId}
-            defaultChecked={term.active}
+            defaultChecked={prior ? prior.active === 'true' : term.active}
             disabled={!canWrite}
             aria-label="Active"
             className="h-4 w-4 rounded border-silver text-action-blue focus:ring-action-blue"
@@ -203,6 +214,9 @@ function AddTerm({ years }: { years: YearOption[] }) {
   const mine = state.target === 'new'
   const error = (field: string) => (mine ? state.fieldErrors?.[field] : undefined)
 
+  const prior = mine ? state.values : undefined
+  const response = useFormResponse(state)
+
   return (
     <Card>
       <h2 className="mb-1 text-[14px] font-medium text-graphite">Add a term</h2>
@@ -216,6 +230,7 @@ function AddTerm({ years }: { years: YearOption[] }) {
             <input
               id="new-name"
               name="name"
+              defaultValue={prior?.name ?? ''}
               placeholder="Term 1"
               className={cx(INPUT_CLASS, error('name') && INPUT_INVALID)}
             />
@@ -228,9 +243,10 @@ function AddTerm({ years }: { years: YearOption[] }) {
             required
           >
             <select
+              key={`new-year-${response}`}
               id="new-year"
               name="academic_year_id"
-              defaultValue={years[0]?.id ?? ''}
+              defaultValue={prior?.academic_year_id || (years[0]?.id ?? '')}
               className={cx(INPUT_CLASS, error('academic_year_id') && INPUT_INVALID)}
             >
               {years.length === 0 ? <option value="">No academic year yet</option> : null}
@@ -247,6 +263,7 @@ function AddTerm({ years }: { years: YearOption[] }) {
               id="new-start"
               type="date"
               name="date_start"
+              defaultValue={prior?.date_start ?? ''}
               className={cx(INPUT_CLASS, error('date_start') && INPUT_INVALID)}
             />
           </LabelledInput>
@@ -256,6 +273,7 @@ function AddTerm({ years }: { years: YearOption[] }) {
               id="new-end"
               type="date"
               name="date_end"
+              defaultValue={prior?.date_end ?? ''}
               className={cx(INPUT_CLASS, error('date_end') && INPUT_INVALID)}
             />
           </LabelledInput>
@@ -266,7 +284,7 @@ function AddTerm({ years }: { years: YearOption[] }) {
               type="number"
               step={1}
               name="sequence"
-              defaultValue={10}
+              defaultValue={prior ? prior.sequence : 10}
               className={cx(INPUT_CLASS, error('sequence') && INPUT_INVALID)}
             />
           </LabelledInput>

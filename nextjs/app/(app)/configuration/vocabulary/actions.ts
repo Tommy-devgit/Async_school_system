@@ -33,6 +33,12 @@ export interface VocabularyFormState {
   target?: string
   /** Set on success so the form can say so without a full navigation. */
   saved?: string
+  /**
+   * What was submitted, echoed back so a refusal does not empty the form.
+   * Keyed by the spec's own field names, because this screen renders whatever
+   * fields the vocabulary declares rather than a fixed set.
+   */
+  values?: Record<string, string>
 }
 
 function text(form: FormData, key: string): string {
@@ -46,6 +52,15 @@ function text(form: FormData, key: string): string {
 */
 function lastValue(form: FormData, key: string): string {
   return String(form.getAll(key).at(-1) ?? '')
+}
+
+/*
+  Every field read the way the action reads it — last value wins, so a checkbox
+  paired with its hidden "false" echoes what the user left it on rather than
+  the hidden default sitting in front of it.
+*/
+function echoed(spec: { fields: ReadonlyArray<{ name: string }> }, form: FormData) {
+  return Object.fromEntries(spec.fields.map((field) => [field.name, lastValue(form, field.name)]))
 }
 
 function resolve(form: FormData) {
@@ -68,12 +83,12 @@ export async function createVocabularyRowAction(
     (name) => lastValue(form, name),
     (name) => form.has(name),
   )
-  if (fieldErrors) return { fieldErrors, target: 'new' }
+  if (fieldErrors) return { fieldErrors, target: 'new', values: echoed(spec, form) }
 
   try {
     await createVocabulary(spec, values ?? {})
   } catch (cause) {
-    return { error: toOdooError(cause).message, target: 'new' }
+    return { error: toOdooError(cause).message, target: 'new', values: echoed(spec, form) }
   }
 
   revalidatePath(`/configuration/vocabulary/${key}`)
@@ -100,12 +115,12 @@ export async function updateVocabularyRowAction(
     (name) => lastValue(form, name),
     (name) => form.has(name),
   )
-  if (fieldErrors) return { fieldErrors, target: String(id) }
+  if (fieldErrors) return { fieldErrors, target: String(id), values: echoed(spec, form) }
 
   try {
     await updateVocabulary(spec, id, values ?? {})
   } catch (cause) {
-    return { error: toOdooError(cause).message, target: String(id) }
+    return { error: toOdooError(cause).message, target: String(id), values: echoed(spec, form) }
   }
 
   revalidatePath(`/configuration/vocabulary/${key}`)

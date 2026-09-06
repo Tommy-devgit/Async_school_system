@@ -4,17 +4,43 @@ import { revalidatePath } from 'next/cache'
 import { requireSession } from '@/lib/odoo/auth'
 import { ethiopianYearOf } from '@/lib/ethiopian-date'
 import { toOdooError } from '@/lib/odoo/errors'
+import { submitted, submittedList } from '@/lib/form-values'
 import {
   ensureGradeSections,
   runSchoolSetup,
   setClassSubjects,
 } from '@/lib/odoo/models/setup'
 
+const SETUP_SCALARS = [
+  'dateStart', 'dateEnd', 'termCount', 'sectionNames', 'isCurrent',
+  'gradeId', 'academicYearId', 'newSectionNames',
+  'classId', 'subjectType', 'maximumMark', 'passMark',
+] as const
+
+const SETUP_LISTS = ['gradeIds', 'sectionIds', 'subjectIds'] as const
+
 export interface SetupState {
   error?: string
   ok?: string
   fieldErrors?: Record<string, string>
+  /**
+   * What was submitted, echoed back so a refusal does not empty the form.
+   *
+   * These three forms are the most expensive in the application to refill —
+   * one of them asks for two dates, a term count and a tick against every
+   * grade in the school — and they are refused for reasons nobody can predict,
+   * like a year that already exists.
+   */
+  values?: Record<(typeof SETUP_SCALARS)[number], string>
+  /** Multi-selects, kept separately because a name submitted many times
+   *  cannot survive a scalar echo. */
+  selected?: Record<(typeof SETUP_LISTS)[number], string[]>
 }
+
+const echo = (form: FormData) => ({
+  values: submitted(form, SETUP_SCALARS),
+  selected: submittedList(form, SETUP_LISTS),
+})
 
 const TERM_COUNTS = new Set(['1', '2', '3', '4'])
 
@@ -56,7 +82,7 @@ export async function schoolSetupAction(
   }
   if (!TERM_COUNTS.has(termCount)) fieldErrors.termCount = 'Choose how the year is divided.'
   if (gradeIds.length === 0) fieldErrors.gradeIds = 'Choose at least one grade.'
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors, ...echo(form) }
 
   try {
     await runSchoolSetup({
@@ -68,7 +94,7 @@ export async function schoolSetupAction(
       sectionNames,
     })
   } catch (cause) {
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, ...echo(form) }
   }
 
   revalidatePath('/configuration')
@@ -97,12 +123,12 @@ export async function gradeSectionsAction(
   if (sectionIds.length === 0 && !newSectionNames) {
     fieldErrors.sectionIds = 'Pick at least one section, or type a new one.'
   }
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors, ...echo(form) }
 
   try {
     await ensureGradeSections({ gradeId, academicYearId, sectionIds, newSectionNames })
   } catch (cause) {
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, ...echo(form) }
   }
 
   revalidatePath('/configuration')
@@ -137,12 +163,12 @@ export async function classSubjectsAction(
   if (!Number.isFinite(passMark) || passMark < 0 || passMark > maximumMark) {
     fieldErrors.passMark = 'The pass mark must sit between zero and the maximum.'
   }
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors, ...echo(form) }
 
   try {
     await setClassSubjects({ classId, subjectIds, subjectType, maximumMark, passMark })
   } catch (cause) {
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, ...echo(form) }
   }
 
   revalidatePath('/configuration')

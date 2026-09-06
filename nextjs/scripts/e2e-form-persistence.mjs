@@ -246,6 +246,53 @@ if (STAFF_ID) {
   console.log('\nresponsibility echo: SKIPPED — set E2E_STAFF_ID to a staff member with a primary')
 }
 
+/* --------------------------- a refused term keeps every field it was given --- */
+
+/*
+  A configuration form, and one refused by validation rather than by Odoo: an
+  end date before the start date. Nothing is written, and before the echo the
+  name, the year, both dates and the order were all thrown away with the
+  refusal — on a screen where every row is its own form, so the refusal also
+  had to land on the right one.
+*/
+console.log('\na refused term keeps every field it was given')
+await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'domcontentloaded' })
+await page.locator('main h1').first().waitFor({ timeout: 30_000 })
+
+const addTerm = page.locator('form:has(#new-name)')
+if ((await addTerm.count()) === 0) {
+  console.log('  SKIPPED — this role is offered no add-a-term form')
+} else {
+  const termName = 'Persistence probe term'
+  await page.fill('#new-name', termName)
+  await page.fill('#new-start', '2026-06-01')
+  await page.fill('#new-end', '2026-01-01') // before the start: refused
+  await page.fill('#new-sequence', '7')
+  const yearChosen = await page.inputValue('#new-year')
+
+  await addTerm.locator('button[type="submit"]').click()
+  await page.waitForTimeout(2500)
+
+  const refusal = (await page.locator('main').textContent()) ?? ''
+  check('the backwards date range was refused', /cannot be before/i.test(refusal))
+  check('no traceback reached the browser', !/Traceback|odoo\.exceptions/i.test(refusal))
+
+  check('the name survived', (await page.inputValue('#new-name')) === termName)
+  check('the start date survived', (await page.inputValue('#new-start')) === '2026-06-01')
+  check('the end date survived', (await page.inputValue('#new-end')) === '2026-01-01')
+  check('the order survived', (await page.inputValue('#new-sequence')) === '7')
+  check('the academic year survived', (await page.inputValue('#new-year')) === yearChosen)
+
+  // The refusal belongs to the add form, not to one of the existing rows.
+  const rows = await page.locator('main table tbody input[name="name"]').all()
+  const rowNames = await Promise.all(rows.map((input) => input.inputValue()))
+  check(
+    'no existing term row was disturbed',
+    rowNames.every((value) => value !== termName),
+    `${rowNames.length} row(s) checked`,
+  )
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nform persistence: ok' : `\nform persistence: ${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

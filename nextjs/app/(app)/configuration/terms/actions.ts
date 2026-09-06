@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+import { submitted } from '@/lib/form-values'
 import { createTerm, updateTerm } from '@/lib/odoo/models/operations'
 
 /**
@@ -20,13 +21,34 @@ import { createTerm, updateTerm } from '@/lib/odoo/models/operations'
  * than restated. The only checks here are the ones that save a round trip.
  */
 
+const TERM_FIELDS = [
+  'name', 'academic_year_id', 'date_start', 'date_end', 'sequence', 'active',
+] as const
+
 export interface TermFormState {
   error?: string
   fieldErrors?: Record<string, string>
   /** Which row the message belongs to — 'new' for the add form. */
   target?: string
   saved?: boolean
+  /**
+   * What was submitted, echoed back so a refusal does not empty the form.
+   * Scoped by `target`, because every row on this screen is its own form and
+   * only the one that was refused should be re-seeded.
+   */
+  values?: Record<(typeof TERM_FIELDS)[number], string>
 }
+
+/*
+  `active` is submitted twice — a hidden "false" followed by the checkbox's
+  "true" — so that unticking it sends something at all. A scalar echo would
+  read the first of the pair and report every term as inactive, so the last
+  value wins here exactly as it does in `collect` below.
+*/
+const echoed = (form: FormData): Record<(typeof TERM_FIELDS)[number], string> => ({
+  ...submitted(form, TERM_FIELDS),
+  active: lastValue(form, 'active'),
+})
 
 function text(form: FormData, key: string): string {
   return String(form.get(key) ?? '').trim()
@@ -88,12 +110,12 @@ export async function createTermAction(
   await requireSession()
 
   const { values, fieldErrors } = collect(form)
-  if (fieldErrors) return { fieldErrors, target: 'new' }
+  if (fieldErrors) return { fieldErrors, target: 'new', values: echoed(form) }
 
   try {
     await createTerm(values ?? {})
   } catch (cause) {
-    return { error: toOdooError(cause).message, target: 'new' }
+    return { error: toOdooError(cause).message, target: 'new', values: echoed(form) }
   }
 
   revalidatePath('/configuration/terms')
@@ -111,12 +133,12 @@ export async function updateTermAction(
   if (!Number.isInteger(id) || id <= 0) return { error: 'That term could not be identified.' }
 
   const { values, fieldErrors } = collect(form)
-  if (fieldErrors) return { fieldErrors, target: String(id) }
+  if (fieldErrors) return { fieldErrors, target: String(id), values: echoed(form) }
 
   try {
     await updateTerm(id, values ?? {})
   } catch (cause) {
-    return { error: toOdooError(cause).message, target: String(id) }
+    return { error: toOdooError(cause).message, target: String(id), values: echoed(form) }
   }
 
   revalidatePath('/configuration/terms')

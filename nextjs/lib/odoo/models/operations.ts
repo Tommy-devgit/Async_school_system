@@ -601,6 +601,118 @@ export function getProgram(id: number): Promise<ProgramRow | null> {
   return readOne<ProgramRow>('school.program', id, PROGRAM_FIELDS)
 }
 
+/** The audience fields, read back so an edit form can open on what is set. */
+export interface ProgramDetail extends ProgramRow {
+  department: Selection
+  responsibility: Selection
+  teacher_ids: number[]
+  subject_ids: number[]
+  class_ids: number[]
+  campus_ids: number[]
+  staff_ids: number[]
+  description: string | false
+  active: boolean
+}
+
+const PROGRAM_DETAIL_FIELDS = [
+  ...PROGRAM_FIELDS,
+  'department',
+  'responsibility',
+  'teacher_ids',
+  'subject_ids',
+  'class_ids',
+  'campus_ids',
+  'staff_ids',
+  'description',
+  'active',
+] as const
+
+export function getProgramDetail(id: number): Promise<ProgramDetail | null> {
+  return orNullOnRefusal(
+    readOne<ProgramDetail>('school.program', id, PROGRAM_DETAIL_FIELDS),
+  )
+}
+
+export interface ProgramIntake {
+  name: string
+  program_type: string
+  audience_type: AudienceType
+  /** A selection code for department/responsibility, ids for the rest. */
+  audience_value: string | number[]
+  start_datetime: string
+  end_datetime: string
+  location?: string
+  organizer_id?: number
+  description?: string
+}
+
+/**
+ * Every audience field, with only the chosen one set.
+ *
+ * The model has an `@api.onchange('audience_type')` that drops the values that
+ * no longer apply — and an onchange never fires over JSON-RPC, so nothing
+ * would clear them. Switching a program from "Class / Section" to "Department"
+ * would leave `class_ids` populated: `_check_audience_values` looks only at
+ * the field matching the new type, so Odoo accepts it, and the record ends up
+ * carrying two audiences with one of them invisible on screen.
+ *
+ * So the write is always the full set. Sending the clears explicitly is the
+ * only way to make an audience change mean what it says.
+ */
+function programAudience(
+  audienceType: AudienceType,
+  audienceValue: string | number[],
+): Record<string, unknown> {
+  const chosen = audienceType === 'all_staff' ? null : AUDIENCE_VALUE_FIELDS[audienceType]
+
+  const values: Record<string, unknown> = {
+    department: false,
+    responsibility: false,
+    // 6 replaces the whole set; an empty list is how a many2many is cleared.
+    teacher_ids: [[6, 0, []]],
+    subject_ids: [[6, 0, []]],
+    class_ids: [[6, 0, []]],
+    campus_ids: [[6, 0, []]],
+    staff_ids: [[6, 0, []]],
+  }
+
+  if (chosen) {
+    values[chosen] = Array.isArray(audienceValue)
+      ? [[6, 0, audienceValue]]
+      : audienceValue
+  }
+
+  return values
+}
+
+function programValues(intake: ProgramIntake): Record<string, unknown> {
+  return {
+    name: intake.name,
+    program_type: intake.program_type,
+    audience_type: intake.audience_type,
+    start_datetime: intake.start_datetime,
+    end_datetime: intake.end_datetime,
+    location: intake.location || false,
+    organizer_id: intake.organizer_id || false,
+    description: intake.description || false,
+    ...programAudience(intake.audience_type, intake.audience_value),
+  }
+}
+
+/**
+ * Create a program in draft.
+ *
+ * `state` is never written here: publishing, cancelling and completing are
+ * allowlisted transitions that go through the model's own methods.
+ */
+export function createProgram(intake: ProgramIntake): Promise<number> {
+  return create('school.program', programValues(intake))
+}
+
+export function updateProgram(id: number, intake: ProgramIntake): Promise<boolean> {
+  return write('school.program', [id], programValues(intake))
+}
+
 /* -------------------------------------------------------------- document --- */
 
 export interface DocumentRow {

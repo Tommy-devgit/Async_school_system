@@ -2,7 +2,13 @@
 
 import { useActionState } from 'react'
 import { Badge, Button, Card, Cell, DataTable, EmptyState, Row, cx } from '@/components/ui'
-import { FormError, FormSuccess, INPUT_CLASS, INPUT_INVALID } from '@/components/ui/form'
+import {
+  FormError,
+  FormSuccess,
+  INPUT_CLASS,
+  INPUT_INVALID,
+  useFormResponse,
+} from '@/components/ui/form'
 import {
   createVocabularyRowAction,
   updateVocabularyRowAction,
@@ -114,6 +120,9 @@ function EditableRow({
     {},
   )
   const mine = state.target === String(row.id)
+  // Only the row that was actually refused re-seeds from the submission.
+  const prior = mine ? state.values : undefined
+  const response = useFormResponse(state)
   const formId = `vocabulary-${vocabulary}-${row.id}`
   const archived = row.values.active === 'false'
 
@@ -123,10 +132,11 @@ function EditableRow({
         {fields.map((field) => (
           <Cell key={field.name}>
             <Input
+              key={`${field.name}-${response}`}
               field={field}
               formId={formId}
               rowKey={String(row.id)}
-              defaultValue={row.values[field.name] ?? ''}
+              defaultValue={prior?.[field.name] ?? row.values[field.name] ?? ''}
               choices={choices[field.name]}
               error={mine ? state.fieldErrors?.[field.name] : undefined}
               disabled={!canWrite}
@@ -189,6 +199,8 @@ function AddRow({
     {},
   )
   const mine = state.target === 'new'
+  const prior = mine ? state.values : undefined
+  const response = useFormResponse(state)
 
   return (
     <Card>
@@ -210,9 +222,10 @@ function AddRow({
                 ) : null}
               </label>
               <Input
+                key={`${field.name}-${response}`}
                 field={field}
                 rowKey="new"
-                defaultValue={field.name === 'active' ? 'true' : ''}
+                defaultValue={prior?.[field.name] ?? (field.name === 'active' ? 'true' : '')}
                 choices={choices[field.name]}
                 error={mine ? state.fieldErrors?.[field.name] : undefined}
               />

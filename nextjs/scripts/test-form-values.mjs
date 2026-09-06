@@ -1,6 +1,6 @@
 /** Run: node scripts/test-form-values.mjs */
 import assert from 'node:assert/strict'
-import { submitted } from '../lib/form-values.ts'
+import { submitted, submittedList } from '../lib/form-values.ts'
 
 function scenario(name, run) {
   run()
@@ -59,6 +59,23 @@ scenario('a file cannot be echoed and does not become "[object File]"', () => {
   const form = new FormData()
   form.set('document', new File(['x'], 'transcript.pdf'))
   assert.equal(submitted(form, ['document']).document, '')
+})
+
+scenario('a repeated name keeps every value, not just the first', () => {
+  const form = new FormData()
+  for (const id of ['4', '7', '9']) form.append('gradeIds', id)
+  assert.deepEqual(submittedList(form, ['gradeIds']), { gradeIds: ['4', '7', '9'] })
+})
+
+scenario('a repeated name that was never submitted is an empty list', () => {
+  assert.deepEqual(submittedList(new FormData(), ['gradeIds']), { gradeIds: [] })
+})
+
+scenario('submitted() would have kept only the first, which is why the pair exists', () => {
+  const form = new FormData()
+  for (const id of ['4', '7', '9']) form.append('gradeIds', id)
+  assert.equal(submitted(form, ['gradeIds']).gradeIds, '4')
+  assert.equal(submittedList(form, ['gradeIds']).gradeIds.length, 3)
 })
 
 console.log('form-values: ok')
