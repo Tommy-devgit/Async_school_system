@@ -6,11 +6,13 @@ import { Button, Note } from '@/components/ui'
 import {
   FormActions,
   FormError,
+  FormResponse,
   FormSection,
   PasswordField,
   ReadOnlyField,
   SelectField,
   TextField,
+  useFormResponse,
   type Option,
 } from '@/components/ui/form'
 import { createTeacherAction, updateTeacherAction, type TeacherFormState } from './actions'
@@ -64,8 +66,23 @@ export function TeacherForm({
   const value = (field: keyof TeacherFormValues) =>
     prior[field] !== undefined ? prior[field] : String(values[field] ?? '')
 
-  const [staffId, setStaffId] = useState(value('staff_id' as keyof TeacherFormValues) || '')
   const errors = state.fieldErrors ?? {}
+
+  /*
+    The staff picker drives the email preview below it, so its value is needed
+    in client state — but it is *not* the source of truth for the field, and
+    must not be, because React 19 resets the form after the action replies and
+    a controlled select has no default to reset to. It is seeded from the
+    rejected submission instead; see useFormResponse.
+  */
+  const response = useFormResponse(state)
+  const submittedStaffId = value('staff_id' as keyof TeacherFormValues) || ''
+  const [staffId, setStaffId] = useState(submittedStaffId)
+  const [seen, setSeen] = useState(response)
+  if (seen !== response) {
+    setSeen(response)
+    setStaffId(submittedStaffId)
+  }
 
   const chosen = useMemo(
     () => eligibleStaff.find((staff) => String(staff.id) === staffId),
@@ -73,136 +90,138 @@ export function TeacherForm({
   )
 
   return (
-    <form action={formAction} className="space-y-6">
-      {mode === 'edit' && values.id ? <input type="hidden" name="id" value={values.id} /> : null}
-      <FormError>{state.error}</FormError>
+    <FormResponse state={state}>
+      <form action={formAction} className="space-y-6">
+        {mode === 'edit' && values.id ? <input type="hidden" name="id" value={values.id} /> : null}
+        <FormError>{state.error}</FormError>
 
-      <FormSection
-        title="Staff member"
-        hint="A teaching profile always belongs to a staff record — that is what Odoo scopes teaching permissions from."
-      >
+        <FormSection
+          title="Staff member"
+          hint="A teaching profile always belongs to a staff record — that is what Odoo scopes teaching permissions from."
+        >
+          {mode === 'create' ? (
+            <>
+              <SelectField
+                label="Staff member"
+                name="staff_id"
+                required
+                options={eligibleStaff.map((staff) => ({
+                  value: String(staff.id),
+                  label: staff.staff_id ? `${staff.name} · ${staff.staff_id}` : staff.name,
+                }))}
+                defaultValue={submittedStaffId}
+                onChange={(event) => setStaffId(event.target.value)}
+                error={errors.staff_id}
+                hint={
+                  eligibleStaff.length
+                    ? 'Only active academic staff, or staff holding a teaching responsibility, appear here.'
+                    : 'No eligible staff. Register and activate a staff member in the academic department first.'
+                }
+              />
+              <ReadOnlyField
+                label="Email on the staff record"
+                value={chosen?.email}
+                hint="Odoo needs this before it can create the teaching login."
+              />
+            </>
+          ) : (
+            <>
+              <ReadOnlyField label="Staff member" value={values.staff_label} />
+              <ReadOnlyField
+                label="Teacher number"
+                value={values.teacher_id}
+                hint="Assigned by Odoo's TCH- sequence."
+              />
+            </>
+          )}
+        </FormSection>
+
+        <FormSection title="Teaching profile">
+          <SelectField
+            label="Teaching status"
+            name="teaching_status"
+            options={teachingStatuses}
+            defaultValue={value('teaching_status') || 'active'}
+            error={errors.teaching_status}
+            hint="Suspending the staff record sets this to inactive automatically."
+          />
+          <TextField
+            label="Qualification"
+            name="qualification"
+            defaultValue={value('qualification')}
+            placeholder="BSc Mathematics"
+          />
+          <TextField
+            label="Specialisation"
+            name="specialization"
+            defaultValue={value('specialization')}
+            placeholder="Mathematics, Physics"
+          />
+          <TextField
+            label="Years of experience"
+            name="years_of_experience"
+            type="number"
+            min={0}
+            defaultValue={value('years_of_experience')}
+          />
+          <TextField
+            label="Maximum weekly periods"
+            name="max_weekly_workload"
+            type="number"
+            min={0}
+            defaultValue={value('max_weekly_workload')}
+            hint="Odoo refuses an assignment that would take this teacher past it. Leave blank for no limit."
+          />
+          <TextField
+            label="Available days"
+            name="available_days"
+            defaultValue={value('available_days')}
+            placeholder="Mon, Tue, Thu"
+          />
+        </FormSection>
+
         {mode === 'create' ? (
           <>
-            <SelectField
-              label="Staff member"
-              name="staff_id"
-              required
-              options={eligibleStaff.map((staff) => ({
-                value: String(staff.id),
-                label: staff.staff_id ? `${staff.name} · ${staff.staff_id}` : staff.name,
-              }))}
-              value={staffId}
-              onChange={(event) => setStaffId(event.target.value)}
-              error={errors.staff_id}
-              hint={
-                eligibleStaff.length
-                  ? 'Only active academic staff, or staff holding a teaching responsibility, appear here.'
-                  : 'No eligible staff. Register and activate a staff member in the academic department first.'
-              }
-            />
-            <ReadOnlyField
-              label="Email on the staff record"
-              value={chosen?.email}
-              hint="Odoo needs this before it can create the teaching login."
-            />
+            <FormSection
+              title="Teaching login"
+              hint="Creating the profile also creates the Odoo login, against the email on the staff record."
+            >
+              <PasswordField
+                label="Initial password"
+                name="login_password"
+                autoComplete="new-password"
+                defaultValue=""
+                error={errors.login_password}
+                hint="Leave blank to have Odoo email a set-password link instead."
+              />
+            </FormSection>
+            <Note>
+              The password is handed straight to Odoo and never stored on the teacher record — it is
+              a non-stored field there too. Leave it blank only if outgoing mail is configured;
+              without a mail server the link goes nowhere and the teacher cannot sign in. If the
+              staff record has no email address, Odoo refuses and says so.
+            </Note>
           </>
-        ) : (
-          <>
-            <ReadOnlyField label="Staff member" value={values.staff_label} />
-            <ReadOnlyField
-              label="Teacher number"
-              value={values.teacher_id}
-              hint="Assigned by Odoo's TCH- sequence."
-            />
-          </>
-        )}
-      </FormSection>
+        ) : null}
 
-      <FormSection title="Teaching profile">
-        <SelectField
-          label="Teaching status"
-          name="teaching_status"
-          options={teachingStatuses}
-          defaultValue={value('teaching_status') || 'active'}
-          error={errors.teaching_status}
-          hint="Suspending the staff record sets this to inactive automatically."
-        />
-        <TextField
-          label="Qualification"
-          name="qualification"
-          defaultValue={value('qualification')}
-          placeholder="BSc Mathematics"
-        />
-        <TextField
-          label="Specialisation"
-          name="specialization"
-          defaultValue={value('specialization')}
-          placeholder="Mathematics, Physics"
-        />
-        <TextField
-          label="Years of experience"
-          name="years_of_experience"
-          type="number"
-          min={0}
-          defaultValue={value('years_of_experience')}
-        />
-        <TextField
-          label="Maximum weekly periods"
-          name="max_weekly_workload"
-          type="number"
-          min={0}
-          defaultValue={value('max_weekly_workload')}
-          hint="Odoo refuses an assignment that would take this teacher past it. Leave blank for no limit."
-        />
-        <TextField
-          label="Available days"
-          name="available_days"
-          defaultValue={value('available_days')}
-          placeholder="Mon, Tue, Thu"
-        />
-      </FormSection>
-
-      {mode === 'create' ? (
-        <>
-          <FormSection
-            title="Teaching login"
-            hint="Creating the profile also creates the Odoo login, against the email on the staff record."
+        <FormActions>
+          <Button type="submit" pending={pending}>
+            {pending
+              ? mode === 'create'
+                ? 'Creating…'
+                : 'Saving…'
+              : mode === 'create'
+                ? 'Create teaching profile'
+                : 'Save changes'}
+          </Button>
+          <Link
+            href={mode === 'edit' && values.id ? `/teachers/${values.id}` : '/teachers'}
+            className="rounded-[9999px] border border-silver px-5 py-2.5 text-[13px] hover:bg-paper"
           >
-            <PasswordField
-              label="Initial password"
-              name="login_password"
-              autoComplete="new-password"
-              defaultValue=""
-              error={errors.login_password}
-              hint="Leave blank to have Odoo email a set-password link instead."
-            />
-          </FormSection>
-          <Note>
-            The password is handed straight to Odoo and never stored on the teacher record — it is
-            a non-stored field there too. Leave it blank only if outgoing mail is configured;
-            without a mail server the link goes nowhere and the teacher cannot sign in. If the
-            staff record has no email address, Odoo refuses and says so.
-          </Note>
-        </>
-      ) : null}
-
-      <FormActions>
-        <Button type="submit" pending={pending}>
-          {pending
-            ? mode === 'create'
-              ? 'Creating…'
-              : 'Saving…'
-            : mode === 'create'
-              ? 'Create teaching profile'
-              : 'Save changes'}
-        </Button>
-        <Link
-          href={mode === 'edit' && values.id ? `/teachers/${values.id}` : '/teachers'}
-          className="rounded-[9999px] border border-silver px-5 py-2.5 text-[13px] hover:bg-paper"
-        >
-          Cancel
-        </Link>
-      </FormActions>
-    </form>
+            Cancel
+          </Link>
+        </FormActions>
+      </form>
+    </FormResponse>
   )
 }

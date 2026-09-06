@@ -5,6 +5,7 @@ import { Button, Note } from '@/components/ui'
 import {
   FormActions,
   FormError,
+  FormResponse,
   FormSection,
   SelectField,
   TextField,
@@ -72,64 +73,66 @@ export function CurriculumForm({
   const errors = state.fieldErrors ?? {}
 
   return (
-    <form action={formAction}>
-      <input type="hidden" name="id" value={id} />
-      <FormError>{state.error}</FormError>
+    <FormResponse state={state}>
+      <form action={formAction}>
+        <input type="hidden" name="id" value={id} />
+        <FormError>{state.error}</FormError>
 
-      <FormSection title={`${subjectName} in ${className}`}>
-        <SelectField
-          label="Type"
-          name="subject_type"
-          options={subjectTypes}
-          defaultValue={value('subject_type')}
-          error={errors.subject_type}
-          hint="Compulsory subjects are taken by everybody; optional and elective ones are chosen."
-        />
-        <TextField
-          label="Selection limit"
-          name="optional_selection_limit"
-          type="number"
-          min={0}
-          step={1}
-          defaultValue={value('optional_selection_limit')}
-          error={errors.optional_selection_limit}
-          hint="How many of this kind a student must choose. Only meaningful for optional and elective subjects; leave at zero otherwise."
-        />
-        <TextField
-          label="Maximum mark"
-          name="maximum_mark"
-          type="number"
-          min={1}
-          step="any"
-          required
-          defaultValue={value('maximum_mark')}
-          error={errors.maximum_mark}
-          hint="What a mark for this subject is out of."
-        />
-        <TextField
-          label="Pass mark"
-          name="pass_mark"
-          type="number"
-          min={0}
-          step="any"
-          required
-          defaultValue={value('pass_mark')}
-          error={errors.pass_mark}
-          hint="Odoo keeps this between zero and the maximum."
-        />
-        <ActiveField defaultChecked={value('active') !== 'false'} />
-      </FormSection>
+        <FormSection title={`${subjectName} in ${className}`}>
+          <SelectField
+            label="Type"
+            name="subject_type"
+            options={subjectTypes}
+            defaultValue={value('subject_type')}
+            error={errors.subject_type}
+            hint="Compulsory subjects are taken by everybody; optional and elective ones are chosen."
+          />
+          <TextField
+            label="Selection limit"
+            name="optional_selection_limit"
+            type="number"
+            min={0}
+            step={1}
+            defaultValue={value('optional_selection_limit')}
+            error={errors.optional_selection_limit}
+            hint="How many of this kind a student must choose. Only meaningful for optional and elective subjects; leave at zero otherwise."
+          />
+          <TextField
+            label="Maximum mark"
+            name="maximum_mark"
+            type="number"
+            min={1}
+            step="any"
+            required
+            defaultValue={value('maximum_mark')}
+            error={errors.maximum_mark}
+            hint="What a mark for this subject is out of."
+          />
+          <TextField
+            label="Pass mark"
+            name="pass_mark"
+            type="number"
+            min={0}
+            step="any"
+            required
+            defaultValue={value('pass_mark')}
+            error={errors.pass_mark}
+            hint="Odoo keeps this between zero and the maximum."
+          />
+          <ActiveField defaultChecked={value('active') !== 'false'} />
+        </FormSection>
 
-      <FormActions>
-        <Button type="submit" variant="primary" pending={pending}>
-          Save changes
-        </Button>
-      </FormActions>
+        <FormActions>
+          <Button type="submit" variant="primary" pending={pending}>
+            Save changes
+          </Button>
+        </FormActions>
 
-      <Note>
-        Report cards are generated against these numbers, so changing the maximum after marks are
-        recorded changes what those marks mean. Odoo keeps the marks themselves untouched.
-      </Note>
-    </form>
+        <Note>
+          Report cards are generated against these numbers, so changing the maximum after marks are
+          recorded changes what those marks mean. Odoo keeps the marks themselves untouched.
+        </Note>
+      </form>
+    </FormResponse>
   )
 }

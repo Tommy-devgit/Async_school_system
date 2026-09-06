@@ -1,9 +1,70 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { createContext, useContext, useId, useState } from 'react'
 import type { ReactNode, SelectHTMLAttributes, InputHTMLAttributes } from 'react'
 import { Icon } from '@/components/icons'
 import { cx } from './primitives'
+
+/**
+ * A number that changes once for every reply a form action sends back.
+ *
+ * React 19 calls `form.reset()` after a `<form action={…}>` action returns —
+ * including when it returns a validation error rather than succeeding. So a
+ * refused save silently empties the form unless every field is re-seeded from
+ * the values the action echoed back. What each kind of field needs was
+ * established by experiment, not by reading:
+ *
+ *   - A **text input** given a fresh `defaultValue` survives. React writes the
+ *     new default onto the existing node, and the reset lands on it.
+ *
+ *   - A **`<select>`** does not. React does not re-point an existing select at
+ *     a different option when only `defaultValue` changes, so the reset puts
+ *     back whatever was selected when the node was created. This is the worst
+ *     of the three, because it does not blank the field — it quietly restores
+ *     a plausible value. A teaching status changed to Inactive and refused for
+ *     an unrelated reason comes back reading Active, and saves that way.
+ *
+ *   - A **controlled** field has no default to reset to at all, so it blanks;
+ *     and because its `value` prop did not change, React sees nothing to
+ *     repair. The DOM and React's state disagree, and React's state is the one
+ *     nobody can see.
+ *
+ * The last two cannot be fixed by correcting state — the state was never
+ * wrong — so the control has to be rebuilt. `SelectField` does that for itself
+ * out of `FormResponse` below; a hand-written `<select>` needs
+ * `key={`field-${useFormResponse(state)}`}` of its own.
+ *
+ * Keyed on the reply's identity rather than its contents, because submitting
+ * the same wrong values twice is exactly when the user most needs the second
+ * refusal to behave like the first.
+ */
+export function useFormResponse(state: unknown): number {
+  // React's own "adjusting state during render" pattern, so the new count is
+  // used by this render rather than one paint later.
+  const [seen, setSeen] = useState(state)
+  const [responses, setResponses] = useState(0)
+
+  if (seen !== state) {
+    setSeen(state)
+    setResponses(responses + 1)
+  }
+
+  return responses
+}
+
+const FormResponseContext = createContext(0)
+
+/**
+ * Wrap a form's fields in this, passing the `useActionState` state, and every
+ * `SelectField` inside keeps the user's choice when a submit is refused.
+ *
+ * Outside a provider the count is a constant, so an unwrapped form behaves
+ * exactly as it did before — this can be adopted a form at a time.
+ */
+export function FormResponse({ state, children }: { state: unknown; children: ReactNode }) {
+  const response = useFormResponse(state)
+  return <FormResponseContext value={response}>{children}</FormResponseContext>
+}
 
 /*
   Form primitives.
@@ -194,9 +255,14 @@ export function SelectField({
   hint?: string
   placeholder?: string
 } & SelectHTMLAttributes<HTMLSelectElement>) {
+  // Rebuilt on each reply from the form's action, so React 19's post-action
+  // reset cannot revert the choice. See useFormResponse.
+  const response = useContext(FormResponseContext)
+
   return (
     <Field label={label} htmlFor={name} error={error} hint={hint} required={required}>
       <select
+        key={`${name}-${response}`}
         id={name}
         name={name}
         required={required}

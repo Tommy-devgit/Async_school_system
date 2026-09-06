@@ -3,7 +3,14 @@
 import { useActionState, useState } from 'react'
 import { Badge, Button, Cell, DataTable, EmptyState, Row } from '@/components/ui'
 import { DateText } from '@/components/ui'
-import { Field, FormError, FormSuccess, INPUT_CLASS, SelectField } from '@/components/ui/form'
+import {
+  Field,
+  FormError,
+  FormResponse,
+  FormSuccess,
+  INPUT_CLASS,
+  SelectField,
+} from '@/components/ui/form'
 import { authorizeOverrideAction, type OverrideState } from '../actions'
 
 /**
@@ -83,37 +90,39 @@ export function OverrideSection({
             Authorise an override
           </button>
         ) : (
-          <form action={formAction} className="space-y-4">
-            <input type="hidden" name="enrollmentId" value={enrollmentId} />
-            <SelectField
-              label="What is being overridden"
-              name="operation"
-              required
-              options={operations}
-              error={errors.operation}
-            />
-            <Field
-              label="Reason"
-              htmlFor="reason"
-              required
-              error={errors.reason}
-              hint="Recorded permanently against your name. Odoo does not allow an override to be deleted."
-            >
-              <textarea id="reason" name="reason" rows={2} className={INPUT_CLASS} />
-            </Field>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" pending={pending}>
-                {pending ? 'Recording…' : 'Authorise'}
-              </Button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-[9999px] border border-silver px-4 py-2 text-[13px] hover:bg-paper"
+          <FormResponse state={state}>
+            <form action={formAction} className="space-y-4">
+              <input type="hidden" name="enrollmentId" value={enrollmentId} />
+              <SelectField
+                label="What is being overridden"
+                name="operation"
+                required
+                options={operations}
+                error={errors.operation}
+              />
+              <Field
+                label="Reason"
+                htmlFor="reason"
+                required
+                error={errors.reason}
+                hint="Recorded permanently against your name. Odoo does not allow an override to be deleted."
               >
-                Cancel
-              </button>
-            </div>
-          </form>
+                <textarea id="reason" name="reason" rows={2} className={INPUT_CLASS} />
+              </Field>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="submit" pending={pending}>
+                  {pending ? 'Recording…' : 'Authorise'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-[9999px] border border-silver px-4 py-2 text-[13px] hover:bg-paper"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </FormResponse>
         )}
       </div>
     </div>

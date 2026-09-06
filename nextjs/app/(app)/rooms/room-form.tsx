@@ -5,6 +5,7 @@ import { Button, Note } from '@/components/ui'
 import {
   FormActions,
   FormError,
+  FormResponse,
   FormSection,
   SelectField,
   TextField,
@@ -61,59 +62,61 @@ export function RoomForm({
   const errors = state.fieldErrors ?? {}
 
   return (
-    <form action={formAction}>
-      {mode === 'edit' && id ? <input type="hidden" name="id" value={id} /> : null}
-      <FormError>{state.error}</FormError>
+    <FormResponse state={state}>
+      <form action={formAction}>
+        {mode === 'edit' && id ? <input type="hidden" name="id" value={id} /> : null}
+        <FormError>{state.error}</FormError>
 
-      <FormSection title="Room">
-        <TextField
-          label="Name"
-          name="name"
-          required
-          defaultValue={value('name')}
-          error={errors.name}
-          hint="Odoo keeps room names unique."
-        />
-        <TextField
-          label="Code"
-          name="code"
-          defaultValue={value('code')}
-          error={errors.code}
-          placeholder="R-301"
-        />
-        <SelectField
-          label="Type"
-          name="room_type"
-          options={roomTypes}
-          defaultValue={value('room_type')}
-          error={errors.room_type}
-        />
-        <TextField
-          label="Capacity"
-          name="capacity"
-          type="number"
-          min={0}
-          step={1}
-          defaultValue={value('capacity')}
-          error={errors.capacity}
-          hint="How many people it seats. Leave blank if it is not recorded."
-        />
-        <ActiveField defaultChecked={value('active') !== 'false'} />
-      </FormSection>
+        <FormSection title="Room">
+          <TextField
+            label="Name"
+            name="name"
+            required
+            defaultValue={value('name')}
+            error={errors.name}
+            hint="Odoo keeps room names unique."
+          />
+          <TextField
+            label="Code"
+            name="code"
+            defaultValue={value('code')}
+            error={errors.code}
+            placeholder="R-301"
+          />
+          <SelectField
+            label="Type"
+            name="room_type"
+            options={roomTypes}
+            defaultValue={value('room_type')}
+            error={errors.room_type}
+          />
+          <TextField
+            label="Capacity"
+            name="capacity"
+            type="number"
+            min={0}
+            step={1}
+            defaultValue={value('capacity')}
+            error={errors.capacity}
+            hint="How many people it seats. Leave blank if it is not recorded."
+          />
+          <ActiveField defaultChecked={value('active') !== 'false'} />
+        </FormSection>
 
-      <FormActions>
-        <Button type="submit" variant="primary" pending={pending}>
-          {mode === 'create' ? 'Add room' : 'Save changes'}
-        </Button>
-      </FormActions>
+        <FormActions>
+          <Button type="submit" variant="primary" pending={pending}>
+            {mode === 'create' ? 'Add room' : 'Save changes'}
+          </Button>
+        </FormActions>
 
-      {mode === 'create' ? (
-        <Note>
-          A room is what a class and a timetable slot both point at. Adding one here makes it
-          available in those pickers immediately.
-        </Note>
-      ) : null}
-    </form>
+        {mode === 'create' ? (
+          <Note>
+            A room is what a class and a timetable slot both point at. Adding one here makes it
+            available in those pickers immediately.
+          </Note>
+        ) : null}
+      </form>
+    </FormResponse>
   )
 }
 
