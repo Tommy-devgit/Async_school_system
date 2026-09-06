@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation'
 
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+// Aliased: this module already has its own `submitted` over the question fields.
+import { submitted as submittedFields } from '@/lib/form-values'
 import {
   addOption,
   createQuestion,
@@ -132,6 +134,10 @@ export async function updateQuestionAction(
   redirect(`/configuration/questionnaire/${id}`)
 }
 
+const OPTION_FIELDS = ['name', 'value', 'sequence'] as const
+
+const submittedOption = (form: FormData) => submittedFields(form, OPTION_FIELDS)
+
 export async function addOptionAction(
   _previous: QuestionFormState,
   form: FormData,
@@ -143,17 +149,21 @@ export async function addOptionAction(
     return { error: 'That question could not be identified.' }
   }
 
+  // Echoed on every refusal below, so a rejected option keeps its label,
+  // stored value and order rather than starting again.
+  const option = submittedOption(form)
+
   const name = text(form, 'name')
   const value = text(form, 'value')
-  if (!name) return { fieldErrors: { name: 'The option needs a label.' } }
+  if (!name) return { fieldErrors: { name: 'The option needs a label.' }, values: option }
   // Odoo requires it, and it is what an answer stores — not the label, which
   // is translatable and may change.
-  if (!value) return { fieldErrors: { value: 'A stored value is required.' } }
+  if (!value) return { fieldErrors: { value: 'A stored value is required.' }, values: option }
 
   try {
     await addOption(questionId, { name, value, sequence: Number(text(form, 'sequence') || '10') })
   } catch (cause) {
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, values: option }
   }
 
   revalidatePath(`/configuration/questionnaire/${questionId}`)

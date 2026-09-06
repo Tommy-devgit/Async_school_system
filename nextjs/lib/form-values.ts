@@ -41,3 +41,24 @@ export function submitted<Field extends string>(
 
   return values
 }
+
+/**
+ * The same, for names a form submits more than once — a multi-select, or a
+ * group of checkboxes sharing a name.
+ *
+ * `submitted()` would keep only the first of them, which is worse than keeping
+ * none: a setup form refused after picking eight grades would come back
+ * showing one, and look as though the other seven had been rejected.
+ */
+export function submittedList<Field extends string>(
+  form: FormData,
+  fields: readonly Field[],
+): Record<Field, string[]> {
+  const values = {} as Record<Field, string[]>
+
+  for (const field of fields) {
+    values[field] = form.getAll(field).filter((value) => typeof value === 'string')
+  }
+
+  return values
+}

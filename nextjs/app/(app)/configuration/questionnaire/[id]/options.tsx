@@ -31,6 +31,8 @@ export function QuestionOptions({
     {},
   )
   const errors = addState.fieldErrors ?? {}
+  // The rejected submission, so a refused option keeps what was typed.
+  const prior = addState.values
 
   return (
     <div>
@@ -78,6 +80,7 @@ export function QuestionOptions({
               <input
                 name="name"
                 required
+                defaultValue={prior?.name ?? ''}
                 aria-label="Label"
                 placeholder="Label"
                 className={INPUT_CLASS}
@@ -92,6 +95,7 @@ export function QuestionOptions({
               <input
                 name="value"
                 required
+                defaultValue={prior?.value ?? ''}
                 aria-label="Stored value"
                 placeholder="Stored value"
                 className={INPUT_CLASS}
@@ -106,7 +110,7 @@ export function QuestionOptions({
               name="sequence"
               type="number"
               min={0}
-              defaultValue={10}
+              defaultValue={prior ? prior.sequence : 10}
               aria-label="Order"
               className={INPUT_CLASS}
             />

@@ -39,6 +39,9 @@ export function SchemeBands({
     addBandAction,
     {},
   )
+  // The rejected band, so "bands cannot overlap" does not also cost the typing.
+  const band = addState.band
+
   const [removeState, removeAction] = useActionState<GradingFormState, FormData>(
     removeBandAction,
     {},
@@ -141,6 +144,7 @@ export function SchemeBands({
             <input
               name="band_name"
               required
+              defaultValue={band?.band_name ?? ''}
               aria-label="Grade"
               placeholder="Grade"
               className={INPUT_CLASS}
@@ -148,6 +152,7 @@ export function SchemeBands({
             <input
               name="band_min"
               type="number"
+              defaultValue={band?.band_min ?? ''}
               min={0}
               max={100}
               step="0.01"
@@ -159,6 +164,7 @@ export function SchemeBands({
             <input
               name="band_max"
               type="number"
+              defaultValue={band?.band_max ?? ''}
               min={0}
               max={100}
               step="0.01"
@@ -169,6 +175,7 @@ export function SchemeBands({
             />
             <input
               name="band_remark"
+              defaultValue={band?.band_remark ?? ''}
               aria-label="Remark"
               placeholder="Remark"
               className={INPUT_CLASS}

@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react'
 import { Badge, Button, Cell, DataTable, EmptyState, Row } from '@/components/ui'
-import { FormError, FormSuccess, INPUT_CLASS } from '@/components/ui/form'
+import { FormError, FormSuccess, INPUT_CLASS, useFormResponse } from '@/components/ui/form'
 import {
   createDocumentRuleAction,
   removeDocumentRuleAction,
@@ -61,6 +61,11 @@ export function DocumentRules({
     {},
   )
   const errors = addState.fieldErrors ?? {}
+
+  // The rejected submission, so a refused rule keeps the grade range and the
+  // document type that were chosen.
+  const prior = addState.values
+  const response = useFormResponse(addState)
 
   return (
     <div>
@@ -124,7 +129,13 @@ export function DocumentRules({
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <label className="block">
               <span className="mb-1.5 block text-[12px] text-slate">Document type</span>
-              <select name="document_type_id" required className={INPUT_CLASS}>
+              <select
+                key={`document_type_id-${response}`}
+                name="document_type_id"
+                required
+                defaultValue={prior?.document_type_id ?? ''}
+                className={INPUT_CLASS}
+              >
                 <option value="">Choose…</option>
                 {documentTypes.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -141,7 +152,12 @@ export function DocumentRules({
 
             <label className="block">
               <span className="mb-1.5 block text-[12px] text-slate">Admission type</span>
-              <select name="admission_type" defaultValue="all" className={INPUT_CLASS}>
+              <select
+                key={`admission_type-${response}`}
+                name="admission_type"
+                defaultValue={prior?.admission_type || 'all'}
+                className={INPUT_CLASS}
+              >
                 {admissionTypes.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -152,7 +168,12 @@ export function DocumentRules({
 
             <label className="block">
               <span className="mb-1.5 block text-[12px] text-slate">Stream</span>
-              <select name="stream_id" defaultValue="" className={INPUT_CLASS}>
+              <select
+                key={`stream_id-${response}`}
+                name="stream_id"
+                defaultValue={prior?.stream_id ?? ''}
+                className={INPUT_CLASS}
+              >
                 <option value="">Any stream</option>
                 {streams.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -169,7 +190,7 @@ export function DocumentRules({
                 type="number"
                 min={1}
                 max={12}
-                defaultValue={1}
+                defaultValue={prior ? prior.grade_from : 1}
                 className={INPUT_CLASS}
               />
               {errors.grade_from ? (
@@ -186,7 +207,7 @@ export function DocumentRules({
                 type="number"
                 min={1}
                 max={12}
-                defaultValue={12}
+                defaultValue={prior ? prior.grade_to : 12}
                 className={INPUT_CLASS}
               />
               {errors.grade_to ? (
@@ -200,7 +221,12 @@ export function DocumentRules({
               <span className="mb-1.5 block text-[12px] text-slate">Required</span>
               <input type="hidden" name="required" value="false" />
               <span className="flex min-h-[38px] items-center gap-2 rounded-[8px] border border-silver bg-white px-3 py-2 text-[13px] text-graphite">
-                <input type="checkbox" name="required" value="true" defaultChecked />
+                <input
+                  type="checkbox"
+                  name="required"
+                  value="true"
+                  defaultChecked={prior ? prior.required === 'true' : true}
+                />
                 Blocks submission
               </span>
             </label>

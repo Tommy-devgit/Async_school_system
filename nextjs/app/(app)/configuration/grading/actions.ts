@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+import { submitted } from '@/lib/form-values'
 import { overlappingBands } from '@/lib/grading-coverage'
 import {
   addBand,
@@ -34,6 +35,8 @@ export interface GradingFormState {
   fieldErrors?: Record<string, string>
   values?: { name: string; pass_percentage: string }
   bands?: BandDraft[]
+  /** The single band the add-a-band form submitted, echoed back on a refusal. */
+  band?: Record<(typeof BAND_FIELDS)[number], string>
 }
 
 function text(form: FormData, key: string): string {
@@ -122,6 +125,8 @@ export async function createSchemeAction(
   redirect(`/configuration/grading/${id}`)
 }
 
+const BAND_FIELDS = ['band_name', 'band_min', 'band_max', 'band_remark'] as const
+
 export async function addBandAction(
   _previous: GradingFormState,
   form: FormData,
@@ -141,13 +146,17 @@ export async function addBandAction(
       remark: text(form, 'band_remark'),
     },
   ])
-  if (parsed.error || !parsed.bands?.length) return { error: parsed.error }
+  // Echoed on both refusals: "bands cannot overlap" is the common one here,
+  // and it is not something the user could work out before typing the band.
+  const band = submitted(form, BAND_FIELDS)
+
+  if (parsed.error || !parsed.bands?.length) return { error: parsed.error, band }
 
   try {
     await addBand(schemeId, parsed.bands[0])
   } catch (cause) {
     // "Grading bands cannot overlap." and the 0–100 range constraint.
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, band }
   }
 
   revalidatePath(`/configuration/grading/${schemeId}`)

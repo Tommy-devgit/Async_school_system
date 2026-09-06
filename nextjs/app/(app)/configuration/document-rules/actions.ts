@@ -4,17 +4,34 @@ import { revalidatePath } from 'next/cache'
 
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+import { submitted } from '@/lib/form-values'
 import {
   createDocumentRule,
   removeDocumentRule,
   updateDocumentRule,
 } from '@/lib/odoo/models/registration'
 
+const RULE_FIELDS = [
+  'document_type_id', 'sequence', 'admission_type',
+  'grade_from', 'grade_to', 'stream_id', 'required',
+] as const
+
 export interface DocumentRuleState {
   error?: string
   ok?: string
   fieldErrors?: Record<string, string>
+  /** What was submitted, echoed back so a refusal does not empty the form. */
+  values?: Record<(typeof RULE_FIELDS)[number], string>
 }
+
+/*
+  `required` is submitted twice — a hidden "false" then the checkbox's "true" —
+  so the last value wins, matching how `checked()` reads it below.
+*/
+const echoed = (form: FormData): Record<(typeof RULE_FIELDS)[number], string> => ({
+  ...submitted(form, RULE_FIELDS),
+  required: String(form.getAll('required').at(-1) ?? ''),
+})
 
 function text(form: FormData, key: string): string {
   return String(form.get(key) ?? '').trim()
@@ -37,7 +54,7 @@ export async function createDocumentRuleAction(
 
   const documentTypeId = Number(text(form, 'document_type_id'))
   if (!Number.isInteger(documentTypeId) || documentTypeId <= 0) {
-    return { fieldErrors: { document_type_id: 'Choose a document type.' } }
+    return { fieldErrors: { document_type_id: 'Choose a document type.' }, values: echoed(form) }
   }
 
   const gradeFrom = Number(text(form, 'grade_from') || '1')
@@ -52,7 +69,7 @@ export async function createDocumentRuleAction(
   if (!fieldErrors.grade_from && !fieldErrors.grade_to && gradeFrom > gradeTo) {
     fieldErrors.grade_to = 'The last grade cannot be below the first.'
   }
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors, values: echoed(form) }
 
   const streamId = Number(text(form, 'stream_id'))
   try {
@@ -66,7 +83,7 @@ export async function createDocumentRuleAction(
       required: checked(form, 'required'),
     })
   } catch (cause) {
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, values: echoed(form) }
   }
 
   revalidatePath('/configuration/document-rules')
