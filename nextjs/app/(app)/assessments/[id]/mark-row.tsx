@@ -1,38 +1,46 @@
 'use client'
 
 import { formatPercent, formatText } from '@/lib/format'
+import type { MarkValues } from '@/lib/mark-diff'
 
 /**
  * One row of the mark list.
  *
- * Presentational: the inputs belong to the single form in `MarkList`, and are
- * named by mark id so one submit carries the whole roster. Percentage and
- * grade are Odoo's computed values, shown read-only.
+ * Fully controlled: the value of every editable cell lives in `MarkList`'s
+ * state, not in the DOM. That is what makes the grid survive React 19's
+ * post-action form reset, which used to restore these controls to the values
+ * the page was rendered with and leave them disagreeing with what Odoo had
+ * just stored.
+ *
+ * Percentage and grade are Odoo's, shown read-only. They are stored computes
+ * driven by the grading scheme, and a status such as `absent` clears them by
+ * design — so an empty grade here is information, not a gap to fill in.
  */
 export function MarkRow({
   markId,
   student,
-  score,
   maxScore,
+  values,
   percentage,
   grade,
-  status,
-  note,
   statusOptions,
   editable,
   error,
+  onChange,
+  onCommit,
 }: {
   markId: number
   student: string
-  score: number
   maxScore: number
+  values: MarkValues
   percentage: number
   grade: string | false
-  status: string
-  note: string
   statusOptions: Array<{ value: string; label: string }>
   editable: boolean
   error?: string
+  onChange: (markId: number, patch: Partial<MarkValues>) => void
+  /** Tell the grid an edit happened, so it can schedule the save. */
+  onCommit: () => void
 }) {
   const cell = 'px-4 py-2 align-middle'
   const control =
@@ -40,31 +48,28 @@ export function MarkRow({
     'focus:outline-none disabled:bg-paper disabled:text-stone'
 
   /**
-   * Spreadsheet-style keyboard navigation.
-   * Allows teachers to use Enter, ArrowDown, or ArrowUp to quickly jump between
-   * students without reaching for the mouse.
+   * Spreadsheet-style keyboard navigation: Enter and the arrows move between
+   * students without reaching for the mouse, which is how a roster of thirty
+   * actually gets entered.
    */
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault() // Prevent form submission or standard scrolling
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter' && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    event.preventDefault()
 
-      // Query all score inputs currently rendered on the page
-      const inputs = Array.from(
-        document.querySelectorAll<HTMLInputElement>('input[id^="score-"]')
-      )
-      const currentIndex = inputs.indexOf(e.currentTarget)
-
-      if (e.key === 'ArrowUp' && currentIndex > 0) {
-        inputs[currentIndex - 1].focus()
-        inputs[currentIndex - 1].select() // Auto-highlight existing score
-      } else if (
-        (e.key === 'Enter' || e.key === 'ArrowDown') &&
-        currentIndex < inputs.length - 1
-      ) {
-        inputs[currentIndex + 1].focus()
-        inputs[currentIndex + 1].select()
-      }
+    const inputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>('input[id^="score-"]'),
+    )
+    const index = inputs.indexOf(event.currentTarget)
+    const next = event.key === 'ArrowUp' ? index - 1 : index + 1
+    if (next >= 0 && next < inputs.length) {
+      inputs[next].focus()
+      inputs[next].select()
     }
+  }
+
+  const edit = (patch: Partial<MarkValues>) => {
+    onChange(markId, patch)
+    onCommit()
   }
 
   return (
@@ -79,13 +84,6 @@ export function MarkRow({
       </td>
 
       <td className={cell}>
-        {/* The original values ride along so the action writes only what moved. */}
-        <input type="hidden" name="markId" value={markId} />
-        <input type="hidden" name={`max-${markId}`} value={maxScore} />
-        <input type="hidden" name={`was-score-${markId}`} value={score ?? ''} />
-        <input type="hidden" name={`was-status-${markId}`} value={status} />
-        <input type="hidden" name={`was-note-${markId}`} value={note} />
-
         <label className="sr-only" htmlFor={`score-${markId}`}>
           Score for {student}
         </label>
@@ -97,7 +95,8 @@ export function MarkRow({
             step="0.01"
             min={0}
             max={maxScore}
-            defaultValue={score ?? ''}
+            value={values.score}
+            onChange={(event) => edit({ score: event.target.value })}
             disabled={!editable}
             aria-invalid={error ? true : undefined}
             onKeyDown={handleKeyDown}
@@ -114,7 +113,8 @@ export function MarkRow({
         <select
           id={`status-${markId}`}
           name={`status-${markId}`}
-          defaultValue={status}
+          value={values.status}
+          onChange={(event) => edit({ status: event.target.value })}
           disabled={!editable}
           className={`${control} text-[12px]`}
         >
@@ -141,7 +141,8 @@ export function MarkRow({
         <input
           id={`note-${markId}`}
           name={`note-${markId}`}
-          defaultValue={note}
+          value={values.note}
+          onChange={(event) => edit({ note: event.target.value })}
           disabled={!editable}
           placeholder="Remark"
           className={`${control} min-w-[120px] w-full text-[12px]`}

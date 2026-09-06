@@ -1,13 +1,26 @@
 /**
  * Which mark rows actually moved.
  *
- * Every row posts the value it was rendered with alongside the current one, so
- * an untouched roster costs no writes and a single corrected score costs
- * exactly one. Kept out of the server action so it can be tested on its own —
- * a bug here silently drops a teacher's entry.
+ * The diff is between two value maps — what the teacher has on screen, and
+ * what Odoo last confirmed — rather than between a form field and a hidden
+ * companion field carrying the value it was rendered with.
+ *
+ * That indirection is what made this worth extracting. The grid auto-saves,
+ * and React 19 resets a form once its action returns, so the visible controls
+ * were being restored to the values the page was *rendered* with while the
+ * hidden baselines had already been refreshed by revalidation. The next
+ * auto-save then diffed a stale control against a fresh baseline and wrote the
+ * old value back over the teacher's entry. Diffing state against state cannot
+ * express that bug: both halves move together or not at all.
  */
 
 export interface MarkValues {
+  score: string
+  status: string
+  note: string
+}
+
+export interface MarkWrite {
   score?: number
   mark_status?: string
   note?: string
@@ -15,32 +28,39 @@ export interface MarkValues {
 
 export interface MarkChange {
   markId: number
-  values: MarkValues
+  values: MarkWrite
 }
 
-function field(form: FormData, key: string): string {
-  return String(form.get(key) ?? '')
-}
-
-export function changedRows(form: FormData, markIds: number[]): MarkChange[] {
+/**
+ * The rows whose entry fields differ from the last confirmed state.
+ *
+ * A blank score is "not entered yet", not "set this back to nothing":
+ * `school.mark` has no way to un-record a score once one exists, so a cleared
+ * box is left alone rather than sent as zero.
+ */
+export function changedRows(
+  current: Record<number, MarkValues>,
+  baseline: Record<number, MarkValues>,
+): MarkChange[] {
   const changes: MarkChange[] = []
 
-  for (const markId of markIds) {
-    const values: MarkValues = {}
-    const score = field(form, `score-${markId}`).trim()
-    const status = field(form, `status-${markId}`).trim()
-    const note = field(form, `note-${markId}`)
+  for (const [key, row] of Object.entries(current)) {
+    const markId = Number(key)
+    const was = baseline[markId]
+    if (!was) continue
 
-    // A blank score is "not entered yet", not "set this back to nothing":
-    // school.mark has no way to un-record a score once one exists.
-    if (score !== '' && score !== field(form, `was-score-${markId}`).trim()) {
-      values.score = Number(score)
+    const values: MarkWrite = {}
+    const score = row.score.trim()
+
+    if (score !== '' && score !== was.score.trim()) {
+      const parsed = Number(score)
+      if (Number.isFinite(parsed)) values.score = parsed
     }
-    if (status !== '' && status !== field(form, `was-status-${markId}`)) {
-      values.mark_status = status
+    if (row.status !== '' && row.status !== was.status) {
+      values.mark_status = row.status
     }
-    if (note !== field(form, `was-note-${markId}`)) {
-      values.note = note
+    if (row.note !== was.note) {
+      values.note = row.note
     }
 
     if (Object.keys(values).length > 0) changes.push({ markId, values })
