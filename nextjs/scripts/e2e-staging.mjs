@@ -38,7 +38,7 @@ function check(name, condition, detail = '') {
 
 async function signIn(context, login) {
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await Promise.all([
@@ -58,7 +58,7 @@ try {
   {
     const context = await browser.newContext()
     const page = await context.newPage()
-    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
     await page.fill('#login', TEACHER)
     await page.fill('#password', 'definitely-the-wrong-password')
     await page.click('#submit-login')
@@ -88,7 +88,7 @@ try {
   const odooIdVisible = await teacherPage.evaluate(() => document.cookie)
   check('cookie is invisible to client JS', !odooIdVisible.includes('school_session'), JSON.stringify(odooIdVisible))
 
-  await teacherPage.goto(`${BASE}/students`, { waitUntil: 'domcontentloaded' })
+  await teacherPage.goto(`${BASE}/students`, { waitUntil: 'networkidle' })
   const teacherBody = (await teacherPage.textContent('body')) ?? ''
   const teacherRows = await teacherPage.locator('tbody tr').count()
   check('teacher sees a scoped student list', teacherRows > 0, `${teacherRows} row(s)`)
@@ -100,7 +100,7 @@ try {
   const registrarPage = await signIn(registrarContext, REGISTRAR)
   check('registrar reaches the dashboard', registrarPage.url().includes('/dashboard'))
 
-  await registrarPage.goto(`${BASE}/students`, { waitUntil: 'domcontentloaded' })
+  await registrarPage.goto(`${BASE}/students`, { waitUntil: 'networkidle' })
   const registrarRows = await registrarPage.locator('tbody tr').count()
   check(
     'registrar sees at least as many students as the teacher',
@@ -131,7 +131,7 @@ try {
   const afterLogout = await teacherContext.cookies()
   check('session cookie cleared', !afterLogout.some((c) => c.name === 'school_session' && c.value))
 
-  await teacherPage.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await teacherPage.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
   check('dashboard no longer reachable', teacherPage.url().includes('/login'))
 
   await teacherContext.close()

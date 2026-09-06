@@ -82,7 +82,7 @@ const AUDIENCE_FIELDS = [
 const read = async () => (await odoo(sid, 'school.announcement', 'read', [[id], AUDIENCE_FIELDS]))[0]
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -91,7 +91,7 @@ try {
   /* ------------------------------------ a draft targeted at some classes --- */
 
   console.log('\na draft can be created with a class audience')
-  await page.goto(`${BASE}/announcements/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/announcements/new`, { waitUntil: 'networkidle' })
   await page.locator('#name').waitFor({ timeout: 30_000 })
 
   await page.fill('#name', TITLE)
@@ -113,7 +113,7 @@ try {
   /* ------------------------------- switching audience clears the old one --- */
 
   console.log('\nchanging the audience clears the one it replaces')
-  await page.goto(`${BASE}/announcements/${id}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/announcements/${id}/edit`, { waitUntil: 'networkidle' })
   await page.locator('#audience_type').waitFor({ timeout: 30_000 })
   await page.selectOption('#audience_type', 'department')
   await page.locator('#audience_code').waitFor({ timeout: 10_000 })

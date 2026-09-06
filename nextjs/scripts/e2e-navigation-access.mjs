@@ -83,7 +83,7 @@ for (const [role, login] of Object.entries(ROLES)) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const page = await context.newPage()
 
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -109,7 +109,7 @@ for (const [role, login] of Object.entries(ROLES)) {
   )
 
   for (const href of offered) {
-    const response = await page.goto(`${BASE}${href}`, { waitUntil: 'domcontentloaded' })
+    const response = await page.goto(`${BASE}${href}`, { waitUntil: 'networkidle' })
     // The dashboard streams; wait for the heading rather than the URL.
     await page.locator('main h1').first().waitFor({ timeout: 30_000 }).catch(() => {})
     const body = (await page.textContent('body')) ?? ''

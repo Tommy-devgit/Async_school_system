@@ -157,14 +157,14 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
 await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
 const openList = async () => {
-  await page.goto(`${BASE}/assessments/${assessmentId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/assessments/${assessmentId}`, { waitUntil: 'networkidle' })
   await page.locator(`#score-${target.id}`).waitFor({ timeout: 30_000 })
 }
 

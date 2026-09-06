@@ -35,7 +35,7 @@ const LAST = `Probe${STAMP}`
 async function signIn(browser, login) {
   const context = await browser.newContext()
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -50,6 +50,20 @@ async function signIn(browser, login) {
   return { context, page }
 }
 
+/**
+ * Wait for a streamed route to finish arriving.
+ *
+ * `networkidle` is not enough after a server action redirects: the load state
+ * has already been reached, so it returns at once while the loading boundary
+ * is still on screen. What actually marks the end is the skeleton going away
+ * and the page's own heading taking its place.
+ */
+async function settled(page) {
+  await page.locator('[role="status"]').first().waitFor({ state: 'detached', timeout: 20000 })
+    .catch(() => {})
+  await page.locator('main h1').first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => {})
+}
+
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 
 try {
@@ -57,7 +71,7 @@ try {
   console.log('\n[1] Staff registration (registrar)')
   const { context: regCtx, page } = await signIn(browser, LOGINS.registrar)
 
-  await page.goto(`${BASE}/staff/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/staff/new`, { waitUntil: 'networkidle' })
   check('registrar can open the registration form', await page.locator('#first_name').isVisible())
   check(
     'personal-data fields are offered to registrar',
@@ -110,6 +124,7 @@ try {
 
   /* ================================================== activation workflow === */
   console.log('\n[2] Activation (Odoo action_activate)')
+  await settled(page)
   let body = (await page.textContent('body')) ?? ''
   check('record starts in Draft', /draft/i.test(body))
   // The record page says the number is pending rather than showing a dash;
@@ -121,7 +136,7 @@ try {
 
   await page.click('button:has-text("Activate")')
   await page.waitForTimeout(6000)
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.reload({ waitUntil: 'networkidle' })
   body = (await page.textContent('body')) ?? ''
 
   const nowActive = /\bactive\b/i.test(body) && !/No staff ID yet/i.test(body)
@@ -132,21 +147,31 @@ try {
 
   /* ==================================================== field protection === */
   console.log('\n[3] Fayda ID protection still holds')
-  const { context: teacherCtx, page: teacherPage } = await signIn(browser, LOGINS.teacher)
-  await teacherPage.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
-  const teacherBody = (await teacherPage.textContent('body')) ?? ''
-  check(
-    'teacher sees the record but not the Fayda value',
-    /Restricted to your role/i.test(teacherBody),
-  )
-  check('teacher page leaks no traceback', !/Traceback|usr\/lib\/python/i.test(teacherBody))
+  /*
+    The teacher-scope section needs a teacher login of its own. Without one it
+    stands down rather than crashing on an undefined credential, so a partial
+    credential set still reports everything it did manage to check.
+  */
+  if (!LOGINS.teacher) {
+    console.log('    SKIPPED — set E2E_TEACHER_LOGIN to check teacher scope')
+  } else {
+    const { context: teacherCtx, page: teacherPage } = await signIn(browser, LOGINS.teacher)
+    await teacherPage.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
+    const teacherBody = (await teacherPage.textContent('body')) ?? ''
+    check(
+      'teacher sees the record but not the Fayda value',
+      /Restricted to your role/i.test(teacherBody),
+    )
+    check('teacher page leaks no traceback', !/Traceback|usr\/lib\/python/i.test(teacherBody))
 
-  await teacherPage.goto(`${BASE}/staff/new`, { waitUntil: 'domcontentloaded' })
-  const teacherFormBody = (await teacherPage.textContent('body')) ?? ''
-  check(
-    'teacher cannot open the registration form',
-    /cannot create staff/i.test(teacherFormBody),
-  )
+    await teacherPage.goto(`${BASE}/staff/new`, { waitUntil: 'networkidle' })
+    const teacherFormBody = (await teacherPage.textContent('body')) ?? ''
+    check(
+      'teacher cannot open the registration form',
+      /cannot create staff/i.test(teacherFormBody),
+    )
+    await teacherCtx.close()
+  }
 
   /* ================================================= ACL fix regression ==== */
   console.log('\n[4] The four repaired record rules')
@@ -161,7 +186,7 @@ try {
       continue
     }
     const { context, page: rolePage } = await signIn(browser, login)
-    await rolePage.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' })
+    await rolePage.goto(`${BASE}${route}`, { waitUntil: 'networkidle' })
     const text = (await rolePage.textContent('body')) ?? ''
     const refused = /Not available to your role|do not have permission/i.test(text)
     const rows = await rolePage.locator('tbody tr').count()
@@ -171,7 +196,7 @@ try {
 
   /* ============================================================= cleanup === */
   console.log('\n[5] Cleanup')
-  await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/staff/${staffId}`, { waitUntil: 'networkidle' })
   const deactivate = page.locator('button:has-text("Deactivate")')
   if (await deactivate.isVisible().catch(() => false)) {
     await deactivate.click()
@@ -182,7 +207,6 @@ try {
     console.log(`    leave staff #${staffId} (${FIRST} ${LAST}) for manual review`)
   }
 
-  await teacherCtx.close()
   await regCtx.close()
 } finally {
   await browser.close()

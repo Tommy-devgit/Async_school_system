@@ -44,7 +44,7 @@ let branchId = 0
 let curriculumBefore = null
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -54,10 +54,10 @@ try {
   /* =================================================================== rooms */
 
   console.log('\nrooms')
-  await page.goto(`${BASE}/rooms`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/rooms`, { waitUntil: 'networkidle' })
   check('the rooms list renders', (await page.locator('main h1').innerText()).includes('Room'))
 
-  await page.goto(`${BASE}/rooms/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/rooms/new`, { waitUntil: 'networkidle' })
   await page.fill('#name', ROOM)
   await page.fill('#code', `PR${STAMP}`)
   await page.selectOption('#room_type', 'laboratory')
@@ -81,7 +81,7 @@ try {
     The unique name is Odoo's constraint, not this form's. Submitting the same
     name again has to surface Odoo's own words rather than a guess at them.
   */
-  await page.goto(`${BASE}/rooms/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/rooms/new`, { waitUntil: 'networkidle' })
   await page.fill('#name', ROOM)
   await page.locator('main form button[type=submit]').click()
   await page.waitForTimeout(3500)
@@ -94,7 +94,7 @@ try {
   check('no traceback reached the page', !/Traceback|odoo\.exceptions/i.test(refusal))
 
   // The capacity CHECK constraint is Odoo's; the form only names the field.
-  await page.goto(`${BASE}/rooms/${roomId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/rooms/${roomId}/edit`, { waitUntil: 'networkidle' })
   await page.fill('#capacity', '-4')
   await page.locator('main form button[type=submit]').click()
   await page.waitForTimeout(2500)
@@ -102,7 +102,7 @@ try {
     (await call('school.room', 'read', [[roomId], ['capacity']]))[0].capacity === 31,
     'capacity unchanged in Odoo')
 
-  await page.goto(`${BASE}/rooms/${roomId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/rooms/${roomId}/edit`, { waitUntil: 'networkidle' })
   await page.fill('#capacity', '44')
   await page.locator('main form button[type=submit]').click()
   await page.waitForURL(/\/rooms\/\d+$/, { timeout: 60_000 })
@@ -121,7 +121,7 @@ try {
   /* ================================================================ branches */
 
   console.log('\nbranches')
-  await page.goto(`${BASE}/branches/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/branches/new`, { waitUntil: 'networkidle' })
   await page.fill('#name', BRANCH)
   await page.fill('#code', `PB${STAMP}`)
   await page.fill('#address', '12 Probe Street')
@@ -155,7 +155,7 @@ try {
   } else {
     curriculumBefore = lines[0]
     const lineId = curriculumBefore.id
-    await page.goto(`${BASE}/curriculum/${lineId}/edit`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/curriculum/${lineId}/edit`, { waitUntil: 'networkidle' })
     check('the curriculum line opens', (await page.locator('#maximum_mark').count()) === 1)
 
     /*
@@ -188,7 +188,7 @@ try {
 
   console.log('\nnavigation')
   for (const route of ['/rooms', '/branches', '/configuration', '/configuration/grading']) {
-    await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(300)
     const current = await page
       .locator('#primary-navigation a')

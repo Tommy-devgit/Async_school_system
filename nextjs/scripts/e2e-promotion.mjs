@@ -106,7 +106,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -178,7 +178,7 @@ if (source && target && grade) {
   }
 
   console.log('\na batch can be created at all')
-  await page.goto(`${BASE}/promotion/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/promotion/new`, { waitUntil: 'networkidle' })
   await page.selectOption('#academicYearId', String(source.id))
   await page.selectOption('#targetAcademicYearId', String(target.id))
   await page.selectOption('#gradeId', String(grade.id))
@@ -214,7 +214,7 @@ if (source && target && grade) {
 
 if (source && grade) {
   console.log("\nOdoo's own year rule is surfaced, not swallowed")
-  await page.goto(`${BASE}/promotion/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/promotion/new`, { waitUntil: 'networkidle' })
   await page.selectOption('#academicYearId', String(source.id))
   await page.selectOption('#targetAcademicYearId', String(source.id))
   await page.selectOption('#gradeId', String(grade.id))
@@ -227,7 +227,7 @@ if (source && grade) {
 
 if (batchId && source && target && grade) {
   console.log('\na second batch for the same grade and year is refused')
-  await page.goto(`${BASE}/promotion/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/promotion/new`, { waitUntil: 'networkidle' })
   await page.selectOption('#academicYearId', String(source.id))
   await page.selectOption('#targetAcademicYearId', String(target.id))
   await page.selectOption('#gradeId', String(grade.id))
@@ -246,7 +246,7 @@ if (batchId && source && target && grade) {
 
 if (batchId) {
   console.log('\ncalculate turns enrolments into outcomes')
-  await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'networkidle' })
   const calculate = page.locator('button:has-text("Calculate outcomes")')
   check('the batch offers Calculate outcomes', (await calculate.count()) > 0)
 
@@ -276,7 +276,7 @@ if (batchId) {
     check('and no line is executed yet', lines.every((l) => l.state === 'draft'))
 
     // The outcomes are visible on the page, not only in the database.
-    await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'networkidle' })
     const rows = await page.locator('main tbody tr').count()
     check('the page shows the outcomes', rows >= Math.min(lines.length, 1), `${rows} row(s)`)
   }
@@ -293,7 +293,7 @@ if (batchId) {
      ['target_class_id', '=', false]],
   ])
 
-  await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'networkidle' })
   const approve = page.locator('button:has-text("Approve")')
   check('the calculated batch offers Approve', (await approve.count()) > 0)
 
@@ -367,7 +367,7 @@ if (batchId) {
         madeClasses.length > 0 || needed.length > 0,
         `${madeClasses.length} created for ${needed.map((g) => g.name).join(' + ')}`)
 
-      await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'networkidle' })
       await runTransition(page, 'Calculate outcomes')
 
       const stillUnassigned = await odoo(sid, 'school.promotion.line', 'search_count', [
@@ -378,7 +378,7 @@ if (batchId) {
       check('recalculating filled in the target class', stillUnassigned === 0,
         `${stillUnassigned} still unassigned`)
 
-      await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'networkidle' })
       await runTransition(page, 'Approve')
       const [retry] = await odoo(sid, 'school.promotion.batch', 'read', [[batchId], ['state']])
       approved = retry.state === 'approved'
@@ -401,7 +401,7 @@ if (approved && process.env.E2E_PROMOTION_APPLY === 'yes') {
   })
   const sample = lines[0]
 
-  await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'networkidle' })
   const apply = page.locator('button:has-text("Apply promotion")')
   check('the approved batch offers Apply promotion', (await apply.count()) > 0)
 
@@ -461,13 +461,13 @@ if (TEACHER) {
   console.log('\na read-only role cannot start or run a batch')
   const readerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const reader = await readerContext.newPage()
-  await reader.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await reader.fill('#login', TEACHER)
   await reader.fill('#password', PASSWORD)
   await reader.click('#submit-login')
   await reader.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
-  await reader.goto(`${BASE}/promotion/new`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/promotion/new`, { waitUntil: 'networkidle' })
   const readerShown = (await reader.locator('main').textContent()) ?? ''
   check('the create route explains the refusal rather than rendering a form',
     /Not available to your role/i.test(readerShown) || /do not have permission/i.test(readerShown))
@@ -475,7 +475,7 @@ if (TEACHER) {
     (await reader.locator('button:has-text("Create batch")').count()) === 0)
 
   if (batchId) {
-    await reader.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'domcontentloaded' })
+    await reader.goto(`${BASE}/promotion/${batchId}`, { waitUntil: 'networkidle' })
     check('and no workflow buttons on the batch itself',
       (await reader.locator('button:has-text("Calculate outcomes")').count()) === 0)
   }

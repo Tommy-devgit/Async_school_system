@@ -74,7 +74,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -89,14 +89,14 @@ try {
   /* ------------------------------------------------ the way in exists --- */
 
   console.log('\nthere is a way to create a program at all')
-  await page.goto(`${BASE}/programs`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/programs`, { waitUntil: 'networkidle' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
   check('the list offers New program', (await page.locator('a[href="/programs/new"]').count()) > 0)
 
   /* --------------------------------------------------------- create --- */
 
   console.log('\na program can be created and reaches Odoo')
-  await page.goto(`${BASE}/programs/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/programs/new`, { waitUntil: 'networkidle' })
   await page.locator('#name').waitFor({ timeout: 30_000 })
 
   await page.fill('#name', TITLE)
@@ -150,7 +150,7 @@ try {
     over RPC.
   */
   console.log('\nchanging the audience clears the one it replaces')
-  await page.goto(`${BASE}/programs/${programId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/programs/${programId}/edit`, { waitUntil: 'networkidle' })
   await page.locator('#audience_type').waitFor({ timeout: 30_000 })
   check('the edit form opened on the stored department', (await page.inputValue('#audience_code')) === department)
 
@@ -173,14 +173,14 @@ try {
   /* ------------------------------------------------- an edit persists --- */
 
   console.log('\nan ordinary edit persists and survives a reload')
-  await page.goto(`${BASE}/programs/${programId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/programs/${programId}/edit`, { waitUntil: 'networkidle' })
   await page.locator('#name').waitFor({ timeout: 30_000 })
   await page.fill('input[name="location"]', 'Science block')
   await page.locator('button:has-text("Save changes")').click()
   await page.waitForURL(/\/programs\/\d+$/, { timeout: 60_000 })
 
   check('the location was changed', (await read(['location'])).location === 'Science block')
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.reload({ waitUntil: 'networkidle' })
   await page.locator('main h1').first().waitFor({ timeout: 30_000 })
   const shown = (await page.locator('main').textContent()) ?? ''
   check('the page shows it after a reload', shown.includes('Science block'))
@@ -188,7 +188,7 @@ try {
   /* ------------------------------------------- Odoo's rules are surfaced --- */
 
   console.log("\nOdoo's own rules are surfaced, not swallowed")
-  await page.goto(`${BASE}/programs/${programId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/programs/${programId}/edit`, { waitUntil: 'networkidle' })
   await page.locator('#end_date').waitFor({ timeout: 30_000 })
   await page.fill('#start_date', '2026-05-10')
   await page.fill('#end_date', '2026-05-01')
@@ -210,20 +210,20 @@ try {
     console.log('\na read-only role is offered no way in')
     const readerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
     const reader = await readerContext.newPage()
-    await reader.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+    await reader.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
     await reader.fill('#login', TEACHER)
     await reader.fill('#password', PASSWORD)
     await reader.click('#submit-login')
     await reader.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
-    await reader.goto(`${BASE}/programs`, { waitUntil: 'domcontentloaded' })
+    await reader.goto(`${BASE}/programs`, { waitUntil: 'networkidle' })
     await reader.locator('main h1').first().waitFor({ timeout: 30_000 })
     const readerText = (await reader.locator('main').textContent()) ?? ''
     check('the teacher can read the list', !/Something went wrong/i.test(readerText))
     check('no New program button', (await reader.locator('a[href="/programs/new"]').count()) === 0)
 
     // And the direct URL refuses in words rather than crashing.
-    await reader.goto(`${BASE}/programs/new`, { waitUntil: 'domcontentloaded' })
+    await reader.goto(`${BASE}/programs/new`, { waitUntil: 'networkidle' })
     await reader.locator('main').first().waitFor({ timeout: 30_000 })
     const denied = (await reader.locator('main').textContent()) ?? ''
     check('the direct URL is refused in words', /cannot create|not available|role/i.test(denied))

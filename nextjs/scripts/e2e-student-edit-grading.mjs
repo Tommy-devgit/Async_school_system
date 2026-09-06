@@ -40,7 +40,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 const STAMP = Date.now().toString().slice(-6)
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -79,11 +79,11 @@ try {
     [[STUDENT], ['name', 'first_name', 'middle_name', 'last_name']]))[0]
   console.log(`\n  student ${STUDENT} before: name=${JSON.stringify(before.name)} parts=${JSON.stringify([before.first_name, before.middle_name, before.last_name])}`)
 
-  await page.goto(`${BASE}/students/${STUDENT}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/students/${STUDENT}`, { waitUntil: 'networkidle' })
   const editLink = page.locator('a[href$="/edit"]').first()
   check('Edit link on the student page', await editLink.isVisible().catch(() => false))
 
-  await page.goto(`${BASE}/students/${STUDENT}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/students/${STUDENT}/edit`, { waitUntil: 'networkidle' })
   const seeded = {
     first: await page.inputValue('#first_name'),
     middle: await page.inputValue('#middle_name'),
@@ -154,7 +154,7 @@ try {
   const ORIGINAL_SCHEME = (await call('res.company', 'read',
     [[1], ['school_grading_scheme_id']]))[0].school_grading_scheme_id[0]
 
-  await page.goto(`${BASE}/configuration/grading`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/configuration/grading`, { waitUntil: 'networkidle' })
   check('grading list renders', (await page.locator('h1').innerText()).includes('Grading'))
   const originalName = (await call('school.grading.scheme', 'read',
     [[ORIGINAL_SCHEME], ['name']]))[0].name
@@ -196,7 +196,7 @@ try {
     (await call('school.grading.band', 'search_count', [[['scheme_id', '=', schemeId]]])) === 6)
 
   // Put it into use, then check the company actually moved.
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.reload({ waitUntil: 'networkidle' })
   await page.locator('button:has-text("Use for report cards")').click()
   await page.waitForTimeout(4000)
   const company = (await call('res.company', 'read',
@@ -207,7 +207,7 @@ try {
 
   // Remove a band so coverage breaks, and confirm the page names the gap.
   await call('school.grading.band', 'unlink', [[bandNames.find((b) => b.name === 'C').id]])
-  await page.goto(`${BASE}/configuration/grading/${schemeId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/configuration/grading/${schemeId}`, { waitUntil: 'networkidle' })
   const gapText = await page.locator('body').innerText()
   check('gap in coverage is named', /Nothing covers the range between/.test(gapText),
     gapText.split('\n').find((l) => /Nothing covers/.test(l)) ?? 'no message')
@@ -215,7 +215,7 @@ try {
   /* ================================================= mobile widths === */
   await page.setViewportSize({ width: 390, height: 844 })
   for (const path of [`/students/${STUDENT}/edit`, '/configuration/grading', `/configuration/grading/${schemeId}`]) {
-    await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(800)
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth)

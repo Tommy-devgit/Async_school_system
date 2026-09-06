@@ -166,7 +166,7 @@ if (BASE) {
   const { chromium } = await import('playwright-core')
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
   const page = await (await browser.newContext({ viewport: { width: 1600, height: 1200 } })).newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -180,7 +180,7 @@ if (BASE) {
     ['/marks', 'mark status'],
     ['/assignments', 'assignment state'],
   ]) {
-    await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(1200)
     const chips = await page.locator('main tbody span').evaluateAll((nodes) =>
       nodes

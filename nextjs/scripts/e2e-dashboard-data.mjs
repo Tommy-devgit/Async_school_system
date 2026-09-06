@@ -81,7 +81,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 async function signIn(login) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1400 } })
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -93,7 +93,7 @@ async function signIn(login) {
     happens to point this week.
   */
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
-  await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
   /*
     The dashboard streams: Next sends a skeleton immediately and swaps the real
     page in when Odoo answers. Landing on the URL is therefore not the same as
@@ -277,7 +277,7 @@ const hrefs = [
 
 const broken = []
 for (const href of hrefs) {
-  const response = await page.goto(`${BASE}${href}`, { waitUntil: 'domcontentloaded' })
+  const response = await page.goto(`${BASE}${href}`, { waitUntil: 'networkidle' })
   const status = response?.status() ?? 0
   const text = await page.locator('main').innerText()
   if (status >= 400 || /Traceback|odoo\.exceptions/i.test(text)) broken.push(`${href} (${status})`)

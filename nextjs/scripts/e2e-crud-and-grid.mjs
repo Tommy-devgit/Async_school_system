@@ -43,7 +43,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 const cleanup = []
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -59,7 +59,7 @@ try {
 
   /* ========================================================= subjects === */
   const SUBJECT = `Verify Subject ${STAMP}`
-  await page.goto(`${BASE}/subjects/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/subjects/new`, { waitUntil: 'networkidle' })
   await page.fill('#name', SUBJECT)
   await page.fill('#code', `VS${STAMP}`)
   await page.fill('#credit_hours', '2')
@@ -76,7 +76,7 @@ try {
   check('credit hours written', madeSubject[0]?.credit_hours === 2)
 
   // Odoo's unique-name constraint must surface, not 500.
-  await page.goto(`${BASE}/subjects/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/subjects/new`, { waitUntil: 'networkidle' })
   await page.fill('#name', SUBJECT)
   await page.locator('form:has(#name) button[type=submit]').click()
   await page.waitForTimeout(3000)
@@ -85,7 +85,7 @@ try {
     dupText.split('\n').find((l) => /exist/i.test(l)) ?? 'no message')
 
   // Edit it.
-  await page.goto(`${BASE}/subjects/${subjectId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/subjects/${subjectId}/edit`, { waitUntil: 'networkidle' })
   check('edit form opens on the stored values',
     (await page.inputValue('#code')) === `VS${STAMP}`)
   await page.fill('#short_name', 'VSX')
@@ -98,7 +98,7 @@ try {
   const [yearId] = await call('school.academic.year', 'search', [[]], { limit: 1 })
   const [sectionId] = await call('school.section', 'search', [[]], { limit: 1 })
   const CLASS = `Verify Class ${STAMP}`
-  await page.goto(`${BASE}/classes/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/classes/new`, { waitUntil: 'networkidle' })
   await page.fill('#name', CLASS)
   await page.selectOption('#academic_year_id', String(yearId))
   // A section is set deliberately: the unique constraint is on
@@ -120,7 +120,7 @@ try {
 
   // The unique (name, section, year) constraint must reach the user.
   if (sectionId) {
-    await page.goto(`${BASE}/classes/new`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/classes/new`, { waitUntil: 'networkidle' })
     await page.fill('#name', CLASS)
     await page.selectOption('#academic_year_id', String(yearId))
     await page.selectOption('#section_id', String(sectionId))
@@ -140,7 +140,7 @@ try {
     if (strays.length) await call('school.class', 'unlink', [strays])
   }
 
-  await page.goto(`${BASE}/classes/${classId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/classes/${classId}/edit`, { waitUntil: 'networkidle' })
   await page.fill('#capacity', '35')
   await page.locator('form:has(#name) button[type=submit]').click()
   await page.waitForURL(`**/classes/${classId}`, { timeout: 60_000 })
@@ -152,7 +152,7 @@ try {
   const low = grades.find((g) => !['11', '12'].includes(String(g.level)))
   const high = grades.find((g) => ['11', '12'].includes(String(g.level)))
   if (low && high) {
-    await page.goto(`${BASE}/classes/new`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/classes/new`, { waitUntil: 'networkidle' })
     await page.selectOption('#grade_id', String(low.id))
     await page.waitForTimeout(400)
     const hiddenForLow = !(await page.locator('#stream_id').isVisible().catch(() => false))
@@ -166,7 +166,7 @@ try {
   /* ==================================================== academic year === */
   const year = (await call('school.academic.year', 'read',
     [[yearId], ['name', 'state', 'date_start', 'date_end']]))[0]
-  await page.goto(`${BASE}/academic-years/${yearId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/academic-years/${yearId}`, { waitUntil: 'networkidle' })
   const yearBody = await page.locator('body').innerText()
   const locked = ['closed', 'archived'].includes(String(year.state))
   check(`year in state '${year.state}' offers the right control`,
@@ -178,7 +178,7 @@ try {
   if (assessmentId) {
     const before = (await call('school.assessment', 'read',
       [[assessmentId], ['name', 'state', 'max_mark']]))[0]
-    await page.goto(`${BASE}/assessments/${assessmentId}/edit`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/assessments/${assessmentId}/edit`, { waitUntil: 'networkidle' })
 
     const frozen = String(before.state) !== 'draft'
     const maxVisible = await page.locator('#max_mark').isVisible().catch(() => false)
@@ -202,7 +202,7 @@ try {
   if (annId) {
     const before = (await call('school.announcement', 'read',
       [[annId], ['name', 'state', 'audience_type']]))[0]
-    await page.goto(`${BASE}/announcements/${annId}/edit`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/announcements/${annId}/edit`, { waitUntil: 'networkidle' })
 
     const published = String(before.state) !== 'draft'
     const audienceEditable = await page.locator('#audience_type').isVisible().catch(() => false)
@@ -226,12 +226,12 @@ try {
   const scheduled = await call('school.class.schedule', 'search_read',
     [[['state', '!=', 'cancelled']], ['class_id']], { limit: 1 })
   const gridClass = scheduled[0]?.class_id?.[0]
-  await page.goto(`${BASE}/schedule/grid`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/schedule/grid`, { waitUntil: 'networkidle' })
   check('grid asks for a class before showing anything',
     /Choose a class/.test(await page.locator('body').innerText()))
 
   if (gridClass) {
-    await page.goto(`${BASE}/schedule/grid?class=${gridClass}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/schedule/grid?class=${gridClass}`, { waitUntil: 'networkidle' })
     const rowCount = await page.locator('table tbody tr').count()
     const odooCount = await call('school.class.schedule', 'search_count',
       [[['class_id', '=', gridClass], ['state', '!=', 'cancelled']]])
@@ -257,7 +257,7 @@ try {
   ]
   let overflowing = []
   for (const route of routes) {
-    await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth)

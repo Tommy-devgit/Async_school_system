@@ -104,7 +104,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -124,7 +124,7 @@ check('an active teacher assignment exists to build on', Boolean(assignment))
 
 let slotId = null
 if (assignment) {
-  await page.goto(`${BASE}/schedule/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/schedule/new`, { waitUntil: 'networkidle' })
   await page.selectOption('#assignmentId', String(assignment.id))
   await page.selectOption('#dayOfWeek', '5') // Saturday — the seed data leaves it clear
   await page.fill('#startTime', '15:30')
@@ -169,7 +169,7 @@ if (assignment) {
 
 if (slotId) {
   console.log('\nan edit reaches Odoo')
-  await page.goto(`${BASE}/schedule/${slotId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/schedule/${slotId}/edit`, { waitUntil: 'networkidle' })
   await page.fill('#endTime', '16:30')
   await page.click('button:has-text("Save changes")')
   await page.waitForURL(/\/schedule\/\d+$/, { timeout: 30_000 }).catch(() => {})
@@ -179,7 +179,7 @@ if (slotId) {
   check('a draft slot did not become rescheduled', edited.state === 'draft')
 
   console.log('\nthe assignment cannot be changed from the edit form')
-  await page.goto(`${BASE}/schedule/${slotId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/schedule/${slotId}/edit`, { waitUntil: 'networkidle' })
   check(
     'the assignment field is disabled',
     await page.locator('#assignmentId').isDisabled(),
@@ -193,7 +193,7 @@ if (slotId) {
   await odoo(sid, 'school.class.schedule', 'action_publish', [[slotId]])
 
   // Moving it with no reason must be refused before anything is written.
-  await page.goto(`${BASE}/schedule/${slotId}/edit`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/schedule/${slotId}/edit`, { waitUntil: 'networkidle' })
   await page.selectOption('#dayOfWeek', '6')
   await page.click('button:has-text("Save changes")')
   await page.waitForTimeout(1200)
@@ -244,7 +244,7 @@ if (slotId && assignment) {
   // Publish the moved slot so it holds its resources again, then clash with it.
   await odoo(sid, 'school.class.schedule', 'action_publish', [[slotId]])
 
-  await page.goto(`${BASE}/schedule/new`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/schedule/new`, { waitUntil: 'networkidle' })
   await page.selectOption('#assignmentId', String(assignment.id))
   await page.selectOption('#dayOfWeek', '6')
   await page.fill('#startTime', '15:45')
@@ -273,7 +273,7 @@ if (slotId) {
   console.log('\na cancelled slot is no longer a dead end')
   await odoo(sid, 'school.class.schedule', 'action_cancel', [[slotId]])
 
-  await page.goto(`${BASE}/schedule/${slotId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/schedule/${slotId}`, { waitUntil: 'networkidle' })
   const reset = page.locator('button:has-text("Return to draft")')
   check('the detail page offers a way back', (await reset.count()) > 0)
 
@@ -296,13 +296,13 @@ if (TEACHER && slotId) {
   console.log('\na read-only role is offered no edit form')
   const readerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const reader = await readerContext.newPage()
-  await reader.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await reader.fill('#login', TEACHER)
   await reader.fill('#password', PASSWORD)
   await reader.click('#submit-login')
   await reader.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
-  await reader.goto(`${BASE}/schedule/${slotId}/edit`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/schedule/${slotId}/edit`, { waitUntil: 'networkidle' })
   const readerShown = (await reader.locator('main').textContent()) ?? ''
   check(
     'the edit route explains the refusal rather than rendering a form',
@@ -339,7 +339,7 @@ for (const undo of cleanup.reverse()) {
 */
 console.log('\na second identical refusal keeps what the first one kept')
 
-await page.goto(`${BASE}/schedule/new`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/schedule/new`, { waitUntil: 'networkidle' })
 await page.locator('#assignmentId').waitFor({ timeout: 30_000 })
 
 const anAssignment = await page

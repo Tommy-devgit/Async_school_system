@@ -84,7 +84,7 @@ for (const [role, login] of Object.entries(ROLES)) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const page = await context.newPage()
 
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -96,7 +96,7 @@ for (const [role, login] of Object.entries(ROLES)) {
     happens to point this week.
   */
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
-  await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
   /*
     The dashboard streams: Next sends a skeleton immediately and swaps the real
     page in when Odoo answers. Landing on the URL is therefore not the same as

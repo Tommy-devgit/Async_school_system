@@ -38,13 +38,13 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 async function dashboard(login) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const page = await context.newPage()
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', login)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
-  await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
   await page.locator('main').first().waitFor({ timeout: 30_000 })
   const text = (await page.locator('main').textContent()) ?? ''
   await context.close()

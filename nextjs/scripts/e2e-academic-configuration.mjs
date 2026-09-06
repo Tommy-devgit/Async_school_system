@@ -83,7 +83,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -103,7 +103,7 @@ check('an academic year exists to put a term in', Boolean(year), year?.name ?? '
 
 if (year) {
   const termName = `E2E Term ${stamp}`
-  await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'networkidle' })
 
   await page.fill('#new-name', termName)
   await page.selectOption('#new-year', String(year.id))
@@ -135,7 +135,7 @@ if (year) {
 
     console.log('\nterms: an edit reaches Odoo')
     const renamed = `${termName} renamed`
-    await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'networkidle' })
     const row = page.locator('tbody tr', { has: page.locator(`input[value="${termName}"]`) })
     await row.locator('input[name="name"]').fill(renamed)
     await row.locator('button:has-text("Save")').click()
@@ -150,7 +150,7 @@ if (year) {
   outside.setFullYear(outside.getFullYear() + 2)
   const outsideIso = outside.toISOString().slice(0, 10)
 
-  await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/configuration/terms`, { waitUntil: 'networkidle' })
   await page.fill('#new-name', `E2E Invalid ${stamp}`)
   await page.selectOption('#new-year', String(year.id))
   await page.fill('#new-start', year.date_start)
@@ -173,7 +173,7 @@ if (year) {
 console.log('\nvocabularies: a section can be added')
 
 const sectionName = `E2E-${stamp}`
-await page.goto(`${BASE}/configuration/vocabulary/sections`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/configuration/vocabulary/sections`, { waitUntil: 'networkidle' })
 await page.fill('#new-name', sectionName)
 await page.click('button:has-text("Add section")')
 await page.waitForTimeout(1500)
@@ -192,7 +192,7 @@ if (section) {
 console.log('\nvocabularies: a clock time survives the round trip as a float')
 
 const shiftName = `E2E Shift ${stamp}`
-await page.goto(`${BASE}/configuration/vocabulary/shifts`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/configuration/vocabulary/shifts`, { waitUntil: 'networkidle' })
 await page.fill('#new-name', shiftName)
 await page.fill('#new-code', `E2E${stamp}`)
 await page.fill('#new-time_start', '08:30')
@@ -213,7 +213,7 @@ if (shift) {
   check('12:45 was stored as 12.75', Math.abs(shift.time_end - 12.75) < 1e-9, String(shift.time_end))
 
   // And it comes back to the form as the same wall-clock time.
-  await page.goto(`${BASE}/configuration/vocabulary/shifts`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/configuration/vocabulary/shifts`, { waitUntil: 'networkidle' })
   const shiftRow = page.locator('tbody tr', { has: page.locator(`input[value="${shiftName}"]`) })
   check(
     'the form redraws it as 08:30',
@@ -223,7 +223,7 @@ if (shift) {
 
 console.log("\nvocabularies: Odoo's uniqueness rule is surfaced")
 
-await page.goto(`${BASE}/configuration/vocabulary/streams`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/configuration/vocabulary/streams`, { waitUntil: 'networkidle' })
 const [existingStream] = await odoo(sid, 'school.stream', 'search_read', [], {
   fields: ['code'],
   limit: 1,
@@ -251,13 +251,13 @@ if (EXAM_LOGIN) {
   console.log('\na read-only role is not offered a form it cannot submit')
   const readerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const reader = await readerContext.newPage()
-  await reader.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await reader.fill('#login', EXAM_LOGIN)
   await reader.fill('#password', PASSWORD)
   await reader.click('#submit-login')
   await reader.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
 
-  await reader.goto(`${BASE}/configuration/vocabulary/sections`, { waitUntil: 'domcontentloaded' })
+  await reader.goto(`${BASE}/configuration/vocabulary/sections`, { waitUntil: 'networkidle' })
   check(
     'the add form is absent',
     (await reader.locator('button:has-text("Add section")').count()) === 0,

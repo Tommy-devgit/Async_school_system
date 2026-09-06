@@ -35,7 +35,7 @@ const readGroup = (model, fields, groupby, domain = []) =>
   call(model, 'read_group', [domain, fields, groupby], { lazy: false })
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('#login', LOGIN)
   await page.fill('#password', PASSWORD)
   await page.click('#submit-login')
@@ -43,7 +43,7 @@ try {
   check('signed in', true)
 
   /* ==================================================== marks analysis === */
-  await page.goto(`${BASE}/marks/analysis`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/marks/analysis`, { waitUntil: 'networkidle' })
   const markGroups = await readGroup('school.mark', ['percentage'], ['class_id', 'subject_id', 'term_id'])
   const distinctRows = new Set(
     markGroups.map((g) => `${g.class_id?.[1] ?? 'No class'}|${g.subject_id?.[1] ?? 'No subject'}`),
@@ -70,7 +70,7 @@ try {
   }
 
   /* =============================================== attendance analysis === */
-  await page.goto(`${BASE}/attendance/analysis`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/attendance/analysis`, { waitUntil: 'networkidle' })
   const attGroups = await readGroup('school.attendance', [], ['class_id', 'status'])
   if (attGroups.length > 0) {
     const total = attGroups.reduce((s, g) => s + g.__count, 0)
@@ -87,7 +87,7 @@ try {
   }
 
   /* ========================================================= workload === */
-  await page.goto(`${BASE}/assignments/workload`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/assignments/workload`, { waitUntil: 'networkidle' })
   const loads = await readGroup('school.teacher.assignment', ['weekly_periods'], ['teacher_id'])
   const withLoad = loads.filter((g) => Number(g.weekly_periods ?? 0) > 0).length
   const body = await page.locator('body').innerText()
@@ -98,7 +98,7 @@ try {
     `${withLoad} teacher(s) with periods`)
 
   /* ============================================================ board === */
-  await page.goto(`${BASE}/announcements/board`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/announcements/board`, { waitUntil: 'networkidle' })
   const states = await readGroup('school.announcement', [], ['state'])
   const counts = Object.fromEntries(states.map((g) => [g.state, g.__count]))
   const boardText = await page.locator('body').innerText()
@@ -114,7 +114,7 @@ try {
   }
 
   /* ========================================================= calendar === */
-  await page.goto(`${BASE}/programs/calendar`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/programs/calendar`, { waitUntil: 'networkidle' })
   const calText = await page.locator('body').innerText()
   check('calendar renders an Ethiopian month',
     /Meskerem|Tikimt|Hidar|Tahsas|Tir|Yekatit|Megabit|Miazia|Ginbot|Sene|Hamle|Nehase|Pagume/.test(calText),
@@ -132,7 +132,7 @@ try {
     const ethiopian = toEthiopian(parseIsoDate(String(programme.start_datetime).slice(0, 10)))
     await page.goto(
       `${BASE}/programs/calendar?year=${ethiopian.year}&month=${ethiopian.month}`,
-      { waitUntil: 'domcontentloaded' },
+      { waitUntil: 'networkidle' },
     )
     const monthText = await page.locator('body').innerText()
     check('the programme appears on its start day',
@@ -157,7 +157,7 @@ try {
   ]
   const overflowing = []
   for (const route of routes) {
-    await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth)

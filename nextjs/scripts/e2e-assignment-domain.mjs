@@ -77,7 +77,7 @@ const sid = await odooLogin(LOGIN)
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await context.newPage()
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -108,7 +108,7 @@ check('state is a plain field — there are no action methods',
 /* ------------------------------------------------------------- the form --- */
 
 console.log('\nthe form narrows to what Odoo would accept')
-await page.goto(`${BASE}/assignments/new`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/assignments/new`, { waitUntil: 'networkidle' })
 const teachers = await optionsOf('teacher_id')
 const classes = await optionsOf('class_id')
 if (teachers.length === 0 || classes.length === 0) {
@@ -217,7 +217,7 @@ if (!pick) {
     console.log('\nOdoo refuses a second teacher for the same subject, class and term')
     if (teachers.length > 1) {
       const beforeDup = await count()
-      await page.goto(`${BASE}/assignments/new`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${BASE}/assignments/new`, { waitUntil: 'networkidle' })
       await page.selectOption('main select[name="class_id"]', classes[0])
       await page.waitForTimeout(400)
       await page.selectOption('main select[name="subject_id"]', pick.subject)
@@ -239,7 +239,7 @@ if (!pick) {
     /* ------------------------------------------------------ transitions --- */
 
     console.log('\nstate moves by an allowlisted field write')
-    await page.goto(`${BASE}/assignments/${row.id}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/assignments/${row.id}`, { waitUntil: 'networkidle' })
     const detail = (await page.locator('main').innerText()) ?? ''
     check('relationships are named, not numbered',
       detail.includes(row.teacher_id[1]) && !/Teacher\s*\n\s*\d+\s*$/m.test(detail))
@@ -285,19 +285,19 @@ if (!pick) {
 /* --------------------------------------------------------------- list ----- */
 
 console.log('\nlist, filters and navigation')
-await page.goto(`${BASE}/assignments`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/assignments`, { waitUntil: 'networkidle' })
 check('the teacher filter is offered',
   (await page.locator('main select').count()) >= 5, `${await page.locator('main select').count()} filters`)
 // The toolbar carries the live count; the subtitle on this screen is a
 // fixed sentence about the single-teacher rule.
 const countText = () => page.locator('main').getByText(/\d+ records?$/).first().innerText()
 const total = await countText()
-await page.goto(`${BASE}/assignments?teacher=${teachers[0]}`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/assignments?teacher=${teachers[0]}`, { waitUntil: 'networkidle' })
 const filtered = await countText()
 check('filtering by teacher changes the result set', total !== filtered, `${total.trim()} vs ${filtered.trim()}`)
 
 for (const url of ['/assignments/999999', '/assignments/abc']) {
-  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' })
+  const response = await page.goto(`${BASE}${url}`, { waitUntil: 'networkidle' })
   const body = (await page.textContent('body')) ?? ''
   check(`${url.padEnd(22)} degrades safely`, !/Traceback|odoo\.exceptions/i.test(body), `http=${response?.status()}`)
 }

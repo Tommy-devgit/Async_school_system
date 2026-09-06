@@ -29,7 +29,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
 
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('#login', LOGIN)
 await page.fill('#password', PASSWORD)
 await page.click('#submit-login')
@@ -40,7 +40,7 @@ await page.click('#submit-login')
   points.
 */
 await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
-await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
 
 console.log('\ndesktop — expanded')
 const rail = page.locator('#primary-navigation')
@@ -72,7 +72,7 @@ check(
 await capture(page, '02-desktop-collapsed')
 
 console.log('\ncollapse preference survives navigation')
-await page.goto(`${BASE}/students`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/students`, { waitUntil: 'networkidle' })
 box = await rail.boundingBox()
 check('still collapsed after reload', Math.round(box.width) === 64, `got ${Math.round(box.width)}`)
 check('active route marked', (await page.locator('#primary-navigation a[aria-current="page"]').count()) === 1)
@@ -88,7 +88,7 @@ await page.click('#primary-navigation button[aria-controls="primary-navigation"]
 await page.waitForTimeout(300)
 
 console.log('\nkeyboard')
-await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
 await page.keyboard.press('Tab')
 const firstFocus = await page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.trim())
 check('first tab stop is in the shell', Boolean(firstFocus), `→ ${firstFocus}`)
@@ -132,12 +132,12 @@ check('escape closes it', (await page.locator('[role="menu"]').count()) === 0)
 console.log('\nmobile — 390px')
 const mobile = await browser.newContext({ viewport: { width: 390, height: 780 }, isMobile: true })
 const mp = await mobile.newPage()
-await mp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await mp.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await mp.fill('#login', LOGIN)
 await mp.fill('#password', PASSWORD)
 await mp.click('#submit-login')
 await mp.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
-await mp.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+await mp.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
 
 check('rail hidden', !(await mp.locator('#primary-navigation').isVisible()))
 check('drawer closed is inert', await mp.locator('#mobile-navigation').evaluate((el) => el.hasAttribute('inert')))
@@ -168,7 +168,7 @@ check('navigating closes the drawer', await mp.locator('#mobile-navigation').eva
 await capture(mp, '05-mobile-students')
 
 console.log('\nthe sidebar button really signs out')
-await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
 await page.click('#primary-navigation button:has-text("Sign out")')
 await page.waitForURL('**/login', { timeout: 60_000 }).catch(() => {})
 check('returns to the login form', page.url().includes('/login'), page.url())
@@ -176,7 +176,7 @@ check(
   'session cookie cleared',
   !(await context.cookies()).some((c) => c.name === 'school_session' && c.value),
 )
-await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' })
 check('dashboard no longer reachable', page.url().includes('/login'))
 
 await browser.close()
