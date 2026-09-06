@@ -46,6 +46,14 @@ export function OverrideSection({
   const [open, setOpen] = useState(false)
   const errors = state.fieldErrors ?? {}
 
+  /*
+    The rejected submission. An override reason is permanent and tends to be
+    the most carefully written text in the application, and the refusals it
+    meets — wrong group, overrides disabled in settings — are ones the user
+    could not have known about before writing it.
+  */
+  const prior = state.values
+
   return (
     <div>
       {overrides.length === 0 ? (
@@ -97,6 +105,7 @@ export function OverrideSection({
                 label="What is being overridden"
                 name="operation"
                 required
+                defaultValue={prior?.operation ?? ''}
                 options={operations}
                 error={errors.operation}
               />
@@ -107,7 +116,13 @@ export function OverrideSection({
                 error={errors.reason}
                 hint="Recorded permanently against your name. Odoo does not allow an override to be deleted."
               >
-                <textarea id="reason" name="reason" rows={2} className={INPUT_CLASS} />
+                <textarea
+                  id="reason"
+                  name="reason"
+                  rows={2}
+                  defaultValue={prior?.reason ?? ''}
+                  className={INPUT_CLASS}
+                />
               </Field>
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="submit" pending={pending}>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useState } from 'react'
+import { useFormResponse } from '@/components/ui/form'
 import { addGuardianAction, editGuardianAction, type GuardianFormState } from '../actions'
 
 interface Option {
@@ -161,14 +162,24 @@ export function EditGuardianRow({
     }
   }, [pending, state.error, onDone])
 
+  /*
+    A refused save re-renders this row from scratch, so it reads back what was
+    submitted before falling back to the stored guardian. Without it a phone
+    number corrected in the same edit as a clashing primary was thrown away
+    along with the refusal.
+  */
+  const prior = state.values
+  const response = useFormResponse(state)
+
   return (
     <form action={formAction} className="grid gap-2 border-t border-silver bg-paper/60 p-3 sm:grid-cols-4">
       <input type="hidden" name="studentId" value={studentId} />
       <input type="hidden" name="guardianId" value={guardianId} />
 
       <select
+        key={`relationship-${response}`}
         name="relationship"
-        defaultValue={relationship}
+        defaultValue={prior?.relationship ?? relationship}
         className={INPUT}
         aria-label="Relationship"
       >
@@ -181,7 +192,7 @@ export function EditGuardianRow({
 
       <input
         name="phone"
-        defaultValue={phone}
+        defaultValue={prior?.phone ?? phone}
         className={INPUT}
         aria-label="Phone"
         placeholder="Phone"
@@ -189,7 +200,7 @@ export function EditGuardianRow({
 
       <input
         name="occupation"
-        defaultValue={occupation}
+        defaultValue={prior?.occupation ?? occupation}
         className={INPUT}
         aria-label="Occupation"
         placeholder="Occupation"
@@ -197,7 +208,12 @@ export function EditGuardianRow({
 
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-1.5 text-[11px] text-graphite">
-          <input type="checkbox" name="is_primary" defaultChecked={isPrimary} className="h-3.5 w-3.5" />
+          <input
+            type="checkbox"
+            name="is_primary"
+            defaultChecked={prior ? prior.is_primary === 'on' : isPrimary}
+            className="h-3.5 w-3.5"
+          />
           Primary
         </label>
         <button

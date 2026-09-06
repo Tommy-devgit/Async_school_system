@@ -13,6 +13,7 @@ import {
   type StaffIntake,
 } from '@/lib/odoo/models/staff'
 import { todayIso } from '@/lib/format'
+import { submitted } from '@/lib/form-values'
 
 /**
  * Every mutation here runs as the signed-in user's Odoo session. Nothing from
@@ -207,7 +208,23 @@ export interface ResponsibilityState {
   error?: string
   ok?: string
   fieldErrors?: Record<string, string>
+  /**
+   * What was submitted, echoed back so a refusal does not empty the form.
+   * Odoo refuses these two forms often and for reasons the user cannot predict
+   * — a clashing primary, a duplicate of an existing row — and re-picking a
+   * campus, a manager and two dates each time is the whole cost of the error.
+   */
+  values?: Record<ResponsibilityField, string>
 }
+
+const RESPONSIBILITY_FIELDS = [
+  'responsibility', 'department', 'campus_id', 'manager_id',
+  'start_date', 'end_date', 'is_primary',
+] as const
+
+type ResponsibilityField = (typeof RESPONSIBILITY_FIELDS)[number]
+
+const echoed = (form: FormData) => submitted(form, RESPONSIBILITY_FIELDS)
 
 /**
  * Add a responsibility.
@@ -224,7 +241,7 @@ export async function addResponsibilityAction(
   const staffId = Number(text(form, 'staffId'))
   const responsibility = text(form, 'responsibility')
   if (!Number.isInteger(staffId) || staffId <= 0) return { error: 'That record could not be identified.' }
-  if (!responsibility) return { error: 'Choose a responsibility.' }
+  if (!responsibility) return { error: 'Choose a responsibility.', values: echoed(form) }
 
   const campusId = Number(text(form, 'campus_id'))
   const managerId = Number(text(form, 'manager_id'))
@@ -242,7 +259,7 @@ export async function addResponsibilityAction(
   } catch (cause) {
     // "already has a primary responsibility", "cannot report to themselves",
     // and the unique constraint on (staff, responsibility, department, date).
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, values: echoed(form) }
   }
 
   revalidatePath(`/staff/${staffId}`)
@@ -273,15 +290,20 @@ export async function updateResponsibilityAction(
   if (!Number.isInteger(staffId) || staffId <= 0) return { error: 'That record could not be identified.' }
 
   const responsibility = text(form, 'responsibility')
-  if (!responsibility) return { error: 'Choose a responsibility.' }
+  if (!responsibility) return { error: 'Choose a responsibility.', values: echoed(form) }
 
   const startDate = text(form, 'start_date')
-  if (!startDate) return { error: 'Give the responsibility a start date.' }
+  if (!startDate) {
+    return { error: 'Give the responsibility a start date.', values: echoed(form) }
+  }
 
   const endDate = text(form, 'end_date')
   if (endDate && endDate < startDate) {
     // Mirrors the model's CHECK(end_date >= start_date); Odoo enforces it too.
-    return { error: 'The effective-to date cannot be before the effective-from date.' }
+    return {
+      error: 'The effective-to date cannot be before the effective-from date.',
+      values: echoed(form),
+    }
   }
 
   const campusId = Number(text(form, 'campus_id'))
@@ -297,7 +319,7 @@ export async function updateResponsibilityAction(
       end_date: endDate || false,
     })
   } catch (cause) {
-    return { error: toOdooError(cause).message }
+    return { error: toOdooError(cause).message, values: echoed(form) }
   }
 
   revalidatePath(`/staff/${staffId}`)

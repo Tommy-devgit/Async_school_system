@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { ethiopianYearOf } from '@/lib/ethiopian-date'
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
+import { submitted } from '@/lib/form-values'
 import { correctAcademicYear, createAcademicYear, updateAcademicYear } from '@/lib/odoo/models/school'
 
 export interface AcademicYearFormState {
@@ -106,10 +107,18 @@ export async function updateAcademicYearAction(
   redirect(`/academic-years/${id}`)
 }
 
+const CORRECTION_FIELDS = ['name', 'date_start', 'date_end', 'reason'] as const
+
 export interface YearCorrectionState {
   error?: string
   ok?: string
   fieldErrors?: Record<string, string>
+  /**
+   * Echoed back so a refusal does not empty the form. The reason is written to
+   * the record's chatter and cannot be recovered from anywhere else once the
+   * form has been cleared.
+   */
+  values?: Record<(typeof CORRECTION_FIELDS)[number], string>
 }
 
 /**
@@ -140,7 +149,9 @@ export async function correctAcademicYearAction(
     fieldErrors.date_end = 'The end date must be after the start date.'
   }
   if (!reason) fieldErrors.reason = 'A reason is required — it is written to the record.'
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+  if (Object.keys(fieldErrors).length > 0) {
+    return { fieldErrors, values: submitted(form, CORRECTION_FIELDS) }
+  }
 
   try {
     await correctAcademicYear({
@@ -152,7 +163,8 @@ export async function correctAcademicYearAction(
     })
   } catch (cause) {
     // "Only a Principal or School Administrator can correct closed years."
-    return { error: toOdooError(cause).message }
+    // Not something the user could have known before writing the reason.
+    return { error: toOdooError(cause).message, values: submitted(form, CORRECTION_FIELDS) }
   }
 
   revalidatePath(`/academic-years/${id}`)

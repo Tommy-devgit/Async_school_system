@@ -3,7 +3,15 @@
 import { useActionState, useState } from 'react'
 import { Button } from '@/components/ui'
 import { EthiopianDateInput } from '@/components/ui/ethiopian-date-input'
-import { Field, FormError, FormResponse, FormSuccess, INPUT_CLASS, SelectField } from '@/components/ui/form'
+import {
+  Field,
+  FormError,
+  FormResponse,
+  FormSuccess,
+  INPUT_CLASS,
+  SelectField,
+  useFormResponse,
+} from '@/components/ui/form'
 import { transferEnrollmentAction, type TransferState } from '../actions'
 
 /**
@@ -29,6 +37,10 @@ export function TransferForm({
   )
   const [open, setOpen] = useState(false)
   const errors = state.fieldErrors ?? {}
+
+  // The rejected submission, so a refusal does not cost the written reason.
+  const prior = state.values
+  const response = useFormResponse(state)
 
   if (!open) {
     return (
@@ -60,6 +72,7 @@ export function TransferForm({
             label="New class"
             name="new_class_id"
             required
+            defaultValue={prior?.new_class_id ?? ''}
             error={errors.new_class_id}
             options={classes.map((option) => ({
               value: String(option.id),
@@ -75,7 +88,14 @@ export function TransferForm({
             error={errors.effective_date}
             hint="Cannot be before the current placement began."
           >
-            <EthiopianDateInput id="effective_date" name="effective_date" />
+            {/* Keyed: it keeps the date in its own state, so a new default
+                only reaches it on a remount. */}
+            <EthiopianDateInput
+              key={`effective_date-${response}`}
+              id="effective_date"
+              name="effective_date"
+              defaultValue={prior?.effective_date ?? ''}
+            />
           </Field>
         </div>
 
@@ -86,7 +106,13 @@ export function TransferForm({
           error={errors.reason}
           hint="Kept with the placement record."
         >
-          <textarea id="reason" name="reason" rows={2} className={INPUT_CLASS} />
+          <textarea
+            id="reason"
+            name="reason"
+            rows={2}
+            defaultValue={prior?.reason ?? ''}
+            className={INPUT_CLASS}
+          />
         </Field>
 
         <div className="flex flex-wrap items-center gap-3">

@@ -3,7 +3,14 @@
 import { useActionState, useState } from 'react'
 import { Button } from '@/components/ui'
 import { EthiopianDateInput } from '@/components/ui/ethiopian-date-input'
-import { Field, FormError, FormSuccess, INPUT_CLASS, TextField } from '@/components/ui/form'
+import {
+  Field,
+  FormError,
+  FormSuccess,
+  INPUT_CLASS,
+  TextField,
+  useFormResponse,
+} from '@/components/ui/form'
 import { correctAcademicYearAction, type YearCorrectionState } from '../actions'
 
 /**
@@ -33,6 +40,10 @@ export function YearCorrectionForm({
   const [open, setOpen] = useState(false)
   const errors = state.fieldErrors ?? {}
 
+  // The rejected submission, so a refusal does not cost the written reason.
+  const prior = state.values
+  const response = useFormResponse(state)
+
   if (!open) {
     return (
       <div className="space-y-3">
@@ -59,13 +70,31 @@ export function YearCorrectionForm({
       <FormSuccess>{state.ok}</FormSuccess>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField label="Name" name="name" required defaultValue={name} error={errors.name} />
+        <TextField
+          label="Name"
+          name="name"
+          required
+          defaultValue={prior?.name ?? name}
+          error={errors.name}
+        />
         <div className="hidden sm:block" />
         <Field label="Starts on" htmlFor="date_start" required error={errors.date_start}>
-          <EthiopianDateInput id="date_start" name="date_start" defaultValue={dateStart} />
+          {/* Keyed: it keeps the date in its own state, so a new default only
+              reaches it on a remount. */}
+          <EthiopianDateInput
+            key={`date_start-${response}`}
+            id="date_start"
+            name="date_start"
+            defaultValue={prior?.date_start ?? dateStart}
+          />
         </Field>
         <Field label="Ends on" htmlFor="date_end" required error={errors.date_end}>
-          <EthiopianDateInput id="date_end" name="date_end" defaultValue={dateEnd} />
+          <EthiopianDateInput
+            key={`date_end-${response}`}
+            id="date_end"
+            name="date_end"
+            defaultValue={prior?.date_end ?? dateEnd}
+          />
         </Field>
       </div>
 
@@ -76,7 +105,13 @@ export function YearCorrectionForm({
         error={errors.reason}
         hint="Written to the year's history, where it stays."
       >
-        <textarea id="reason" name="reason" rows={3} className={INPUT_CLASS} />
+        <textarea
+          id="reason"
+          name="reason"
+          rows={3}
+          defaultValue={prior?.reason ?? ''}
+          className={INPUT_CLASS}
+        />
       </Field>
 
       <div className="flex flex-wrap items-center gap-3">

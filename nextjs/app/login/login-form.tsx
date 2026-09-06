@@ -39,6 +39,13 @@ export function LoginForm() {
           className={FIELD}
           placeholder="you@school.example"
           /*
+            Handed back by the action, because a refused sign-in used to blank
+            this too — so a mistyped password cost the user their address as
+            well, on exactly the machines where it is least convenient to
+            retype. The password field is never re-seeded.
+          */
+          defaultValue={state.values?.login ?? ''}
+          /*
             Both fields are marked invalid, never one of them. Odoo answers a
             bad email and a bad password with the same refusal on purpose —
             saying which half was wrong tells an attacker which logins exist.
