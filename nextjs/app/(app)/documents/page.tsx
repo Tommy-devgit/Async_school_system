@@ -1,5 +1,7 @@
+import Link from 'next/link'
 import { DateText, StatusBadge } from '@/components/ui'
 import { ResourceList } from '@/components/resource-list'
+import { hasAccess } from '@/lib/odoo/client'
 import { toOdooOrder } from '@/lib/list-query'
 import { documentTypeOptions } from '@/lib/odoo/filter-options'
 import { listDocuments } from '@/lib/odoo/models/operations'
@@ -14,9 +16,10 @@ function owner(student: Many2one, staff: Many2one): string {
 }
 
 export default async function DocumentsPage({ searchParams }: PageProps<'/documents'>) {
-  const [states, types] = await Promise.all([
+  const [states, types, canCreate] = await Promise.all([
     selectionOptions('school.document', 'state'),
     documentTypeOptions(),
+    hasAccess('school.document', 'create'),
   ])
 
   return (
@@ -27,6 +30,16 @@ export default async function DocumentsPage({ searchParams }: PageProps<'/docume
       searchParams={searchParams}
       subtitle="Odoo records a checksum and refuses to delete document history."
       search={{ placeholder: 'Document, student or staff name' }}
+      action={
+        canCreate ? (
+          <Link
+            href="/documents/new"
+            className="rounded-[9999px] bg-ink px-4 py-2 text-[13px] text-white hover:bg-graphite"
+          >
+            File a document
+          </Link>
+        ) : null
+      }
       filters={[
         { key: 'status', label: 'Status', options: states },
         { key: 'type', label: 'Type', options: types },
