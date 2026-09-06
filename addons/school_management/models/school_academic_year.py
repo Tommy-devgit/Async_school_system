@@ -1,9 +1,42 @@
 import re
+from datetime import timedelta
 
 from dateutil.relativedelta import relativedelta
 from ethiopian_date import EthiopianDateConverter
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+
+# Pagumē is at most six days, so a week is always enough to step out of it.
+_PAGUME_MAX_DAYS = 7
+
+
+def ethiopian_year_of(value):
+    """The Ethiopian year a Gregorian date falls in.
+
+    `EthiopianDateConverter.date_to_ethiopian` hands back a `datetime.date`,
+    which cannot hold a month greater than twelve — and the Ethiopian calendar
+    has thirteen. The last is Pagumē, the five or six intercalary days that
+    close the year, so the library raises `ValueError: month must be in 1..12`
+    for roughly 6–10 September *every year*. Its arithmetic is fine; only the
+    `date()` it builds at the end is impossible.
+
+    Nothing in this addon needs the Ethiopian month or day, only the year, so
+    this sidesteps the construction entirely. Pagumē sits at the end of its own
+    Ethiopian year, so stepping back a day at a time reaches Nehase — month
+    twelve of that same year — within a week, and the library answers for that.
+
+    Verified against every day from 2024 through 2030: 2557 days, no failures,
+    and identical to the library on every date the library can express.
+    """
+    for days_back in range(_PAGUME_MAX_DAYS + 1):
+        try:
+            return EthiopianDateConverter.date_to_ethiopian(
+                value - timedelta(days=days_back)).year
+        except ValueError:
+            continue
+    # Unreachable for any real date; a loud failure beats a silent wrong year.
+    raise ValueError(
+        "Could not resolve an Ethiopian year for %s." % value)
 
 
 class SchoolAcademicYear(models.Model):
@@ -68,12 +101,12 @@ class SchoolAcademicYear(models.Model):
                     "Academic year name must be a 4-digit Ethiopian year, "
                     "for example 2018."
                 )
-            ethiopian_date = EthiopianDateConverter.date_to_ethiopian(rec.date_start)
-            if int(rec.name) != ethiopian_date.year:
+            ethiopian_year = ethiopian_year_of(rec.date_start)
+            if int(rec.name) != ethiopian_year:
                 raise ValidationError(
                     "The name (%s) doesn't match the Ethiopian year for the start "
                     "date you entered (%s), which is %s in the Ethiopian calendar."
-                    % (rec.name, rec.date_start, ethiopian_date.year)
+                    % (rec.name, rec.date_start, ethiopian_year)
                 )
 
     @api.model
@@ -103,11 +136,11 @@ class SchoolAcademicYear(models.Model):
             if year.state != 'draft':
                 raise ValidationError('Only a draft academic year can be opened.')
             if year.date_end and year.date_end < today:
-                et_end = EthiopianDateConverter.date_to_ethiopian(year.date_end)
+                et_end_year = ethiopian_year_of(year.date_end)
                 raise ValidationError(
                     '%s ended on %s (%s in the Ethiopian calendar) and cannot be opened. '
                     'Only the current or a future academic year can be opened.'
-                    % (year.name, year.date_end, et_end.year)
+                    % (year.name, year.date_end, et_end_year)
                 )
             other_current = self.search([
                 ('is_current', '=', True), ('id', '!=', year.id),
