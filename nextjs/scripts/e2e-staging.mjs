@@ -78,7 +78,20 @@ try {
   console.log('\n[2] Teacher — record-rule scope')
   const teacherContext = await browser.newContext()
   const teacherPage = await signIn(teacherContext, TEACHER)
-  check('teacher reaches the dashboard', teacherPage.url().includes('/dashboard'), teacherPage.url())
+  /*
+    Signed in, not "on the dashboard".
+
+    `landingPath` sends each role to the screen its job starts on — a teacher to
+    their open mark lists, a registrar to submitted registrations — so asserting
+    on /dashboard tested the routing table rather than the sign-in, and failed
+    for every role that has somewhere better to be. Leaving /login is what
+    proves the session was established.
+  */
+  check(
+    'teacher signs in and leaves the login page',
+    !new URL(teacherPage.url()).pathname.startsWith('/login'),
+    teacherPage.url(),
+  )
 
   const cookies = await teacherContext.cookies()
   const appCookie = cookies.find((c) => c.name === 'school_session')
@@ -98,7 +111,11 @@ try {
   console.log('\n[3] Registrar — wider scope, and the known-dead mark rule')
   const registrarContext = await browser.newContext()
   const registrarPage = await signIn(registrarContext, REGISTRAR)
-  check('registrar reaches the dashboard', registrarPage.url().includes('/dashboard'))
+  check(
+    'registrar signs in and leaves the login page',
+    !new URL(registrarPage.url()).pathname.startsWith('/login'),
+    registrarPage.url(),
+  )
 
   await registrarPage.goto(`${BASE}/students`, { waitUntil: 'networkidle' })
   const registrarRows = await registrarPage.locator('tbody tr').count()
