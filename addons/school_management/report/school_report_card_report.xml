@@ -26,7 +26,13 @@
                         <div class="row mb-4 p-3 bg-light rounded border">
                             <div class="col-6">
                                 <div class="mb-1"><strong>Student Name:</strong> <span t-esc="card.student_id.name"/></div>
-                                <div class="mb-1"><strong>Student ID:</strong> <span t-esc="card.student_id.id"/></div>
+                                <!--
+                                    The admission number, not the database id. A
+                                    guardian handed this card cannot do anything
+                                    with an internal primary key, and quoting one
+                                    back to the office identifies nothing.
+                                -->
+                                <div class="mb-1"><strong>Student ID:</strong> <span t-esc="card.student_id.admission_number or '—'"/></div>
                                 <div><strong>Grade / Section:</strong> <span t-esc="card.class_id.name"/></div>
                             </div>
                             <div class="col-6 text-end">
@@ -90,6 +96,17 @@
                                                 <th>Grade Rank:</th>
                                                 <td class="text-end fw-bold"><span t-esc="card.grade_rank"/> / <span t-esc="card.grade_size"/></td>
                                             </tr>
+                                            <!--
+                                                Conduct is graded A-D on every card and was the one
+                                                summary figure the printed copy left out, so the
+                                                document a guardian receives disagreed with the
+                                                record the school keeps.
+                                            -->
+                                            <tr t-if="card.conduct">
+                                                <th>Conduct:</th>
+                                                <!-- t-field renders the selection's label, not its code. -->
+                                                <td class="text-end fw-bold"><span t-field="card.conduct"/></td>
+                                            </tr>
                                         </table>
                                     </div>
                                 </div>
@@ -111,6 +128,29 @@
                                             <div class="text-muted small text-center py-3">No attendance records registered for this term.</div>
                                         </t>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!--
+                            The remarks the card already holds.
+
+                            Both were captured on the record and shown in the
+                            application, and neither reached the printed copy —
+                            which left a signature line for a Homeroom Teacher
+                            directly beneath nothing they had written.
+                        -->
+                        <div class="row g-3 mb-4" t-if="card.homeroom_remarks or card.principal_remarks">
+                            <div class="col-6" t-if="card.homeroom_remarks">
+                                <div class="card h-100 border">
+                                    <div class="card-header bg-secondary text-white fw-bold py-1">Homeroom Teacher's Remarks</div>
+                                    <div class="card-body p-2 small" style="white-space: pre-line;"><t t-out="card.homeroom_remarks"/></div>
+                                </div>
+                            </div>
+                            <div class="col-6" t-if="card.principal_remarks">
+                                <div class="card h-100 border">
+                                    <div class="card-header bg-secondary text-white fw-bold py-1">Director's Remarks</div>
+                                    <div class="card-body p-2 small" style="white-space: pre-line;"><t t-out="card.principal_remarks"/></div>
                                 </div>
                             </div>
                         </div>

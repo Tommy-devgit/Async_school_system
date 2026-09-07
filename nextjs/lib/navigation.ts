@@ -37,12 +37,16 @@ import type { SchoolRoles } from '@/lib/odoo/types'
  * Front Office has none on any academic model beyond students. Widening those
  * is an authorisation decision for the owner — do not work around it here.
  *
- * One deliberate omission. A teacher holds read on school.report.card, but
- * that model carries **no record rule at all**, so the rows are unscoped: every
- * report card in the school, not the teacher's own classes. /report-cards is
- * therefore not offered to a teacher. Hiding the link is not what makes that
- * safe — only a record rule would — so it is written up rather than papered
- * over here.
+ * A teacher is now offered /report-cards and /rankings, and the two always
+ * move together — every ranking row links to a card, so offering one without
+ * the other hands a teacher a table of dead links.
+ *
+ * They were both withheld for a long time, for a reason that has since been
+ * fixed rather than forgotten: school.report.card carried no record rule at
+ * all, so a teacher reading it got every card in the school. It has four rules
+ * now, and a teacher measurably sees only the classes they teach — a card in a
+ * class they do not teach returns nothing from a search and refuses a direct
+ * read. The record rule is what makes this safe; the menu never was.
  *
  * The sections are the school's own domains rather than the module's table
  * names: somebody looking for "who is in Grade 7" reaches for People, not for
@@ -192,7 +196,22 @@ const NAV_RULES: NavRuleSection[] = [
         href: '/report-cards',
         label: 'Report cards',
         icon: 'reportCards',
-        visible: (r) => any(r.isExamOfficer, r.isAdmin, r.isDirector, r.isRegistrar),
+        visible: (r) =>
+          any(r.isTeacher, r.isExamOfficer, r.isAdmin, r.isDirector, r.isRegistrar),
+      },
+      {
+        href: '/rankings',
+        label: 'Rankings',
+        icon: 'rankings',
+        description: 'Class and grade position',
+        /*
+          Read from school.report.card, so this is offered to exactly whoever
+          is offered /report-cards. The two move together because every row
+          here links to a card: offering one without the other would give a
+          teacher a table of dead links.
+        */
+        visible: (r) =>
+          any(r.isTeacher, r.isExamOfficer, r.isAdmin, r.isDirector, r.isRegistrar),
       },
       {
         href: '/promotion',

@@ -34,6 +34,7 @@ const PATHS = {
   marks: 'M4 20V10M9.5 20V4M15 20v-7M20.5 20V7',
   reportCards: 'M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h4',
   promotion: 'M12 3 2.5 7.5 12 12l9.5-4.5zM6 10v5.5c0 1.5 2.7 3 6 3s6-1.5 6-3V10M20.5 8v6',
+  rankings: 'M3.5 20.5h17M10 20.5V8h4v12.5M4 20.5v-6.5h6M20 20.5v-4.5h-6M12 4.5l.7 1.5 1.6.2-1.2 1.1.3 1.6-1.4-.8-1.4.8.3-1.6-1.2-1.1 1.6-.2z',
   announcements: 'M4 9v5h3l7 4V5l-7 4zM17.5 9a4 4 0 0 1 0 6M14 18v3',
   programs: 'M4 6h16v14H4zM8 3v5M16 3v5M4 11h16M12 13l.9 1.9 2.1.3-1.5 1.4.4 2-1.9-1-1.9 1 .4-2-1.5-1.4 2.1-.3z',
   documents: 'M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6M9 8h2',

@@ -46,14 +46,26 @@ const ROLES = {
   hr: process.env.E2E_HR_LOGIN,
 }
 
-/** What the menu is expected to offer, mirroring test-navigation-access.mjs. */
+/**
+ * What the menu is expected to offer, mirroring test-navigation-access.mjs.
+ *
+ * Written out here rather than imported on purpose: this suite exists to check
+ * the application against an expectation held somewhere else, and importing the
+ * navigation would make it agree with itself. The cost is that adding a route
+ * means editing two files, and forgetting the second one fails here — which is
+ * the tripwire working, not a nuisance.
+ *
+ * Teacher counts two more than the other roles' single addition: /rankings and
+ * /report-cards were both opened to teachers at once, because every ranking row
+ * links to a card.
+ */
 const EXPECTED_COUNT = {
-  admin: 24,
-  director: 17,
-  registrar: 22,
-  teacher: 20,
+  admin: 25,
+  director: 18,
+  registrar: 23,
+  teacher: 22,
   frontoffice: 6,
-  exam: 13,
+  exam: 14,
   hr: 4,
 }
 
