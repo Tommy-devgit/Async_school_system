@@ -150,7 +150,15 @@ function KpiCard({ label, value, context, icon, href, spark }: Kpi) {
         </span>
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
+        {/*
+          `data-tile` marks this as a headline figure. `.tabular` cannot: it is
+          a typographic utility for lining numerals up, and it sits on chart
+          labels, record counts and table cells too — so a sweep for dashed
+          tiles was picking up student-ID cells that are legitimately blank and
+          calling the dashboard broken.
+        */}
         <span
+          data-tile="kpi"
           className={cx(
             'tabular text-[27px] leading-none',
             unavailable ? 'text-silver' : 'text-graphite',
@@ -200,7 +208,28 @@ export function Section({
         <h2 className="text-[13px] font-medium tracking-wide text-graphite uppercase">{title}</h2>
         {hint ? <p className="min-w-0 truncate text-[11.5px] text-stone">{hint}</p> : null}
       </div>
-      <div className={cx('grid items-start gap-3', className)}>{children}</div>
+      {/*
+        The two `min-w-0` rules are load-bearing, not tidying.
+
+        A grid item defaults to `min-width: auto`, which refuses to shrink below
+        its content's min-content width. Every dashboard nests a further grid in
+        here, and the teacher's holds a table: on a 390px screen that column
+        measured 376px inside 358px and pushed the whole page wide, so the
+        landing screen scrolled sideways. The table already sits in its own
+        `overflow-x-auto` — it never got the chance to scroll, because nothing
+        above it would give up the width.
+
+        Both levels are needed. The nineteen nested grids across the seven
+        dashboards are laid out the same way, so releasing only the outer one
+        moves the overflow down a level rather than fixing it. Stating it here
+        fixes the class of bug rather than nineteen instances of it, and keeps
+        the next dashboard from reintroducing it.
+      */}
+      <div
+        className={cx('grid items-start gap-3 *:min-w-0 [&>.grid>*]:min-w-0', className)}
+      >
+        {children}
+      </div>
     </section>
   )
 }
@@ -470,6 +499,7 @@ export function StructureStrip({
           <>
             <dt className="text-[11px] text-stone">{item.label}</dt>
             <dd
+              data-tile="structure"
               className={cx(
                 'tabular mt-0.5 text-[19px] leading-none',
                 item.value === null ? 'text-silver' : 'text-graphite',

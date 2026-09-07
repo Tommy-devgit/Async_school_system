@@ -144,9 +144,18 @@ for (const [role, login] of Object.entries(ROLES)) {
     levels.join(''),
   )
 
-  // Every tile is a real figure or an explicit dash, never a zero standing in
-  // for a refusal.
-  const tiles = await page.locator('main .tabular').allTextContents()
+  /*
+    Every tile is a real figure or an explicit dash, never a zero standing in
+    for a refusal.
+
+    Selected by `[data-tile]`, not by `.tabular`. The latter is a typographic
+    utility for lining numerals up and sits on chart labels, the record count
+    in a list toolbar and table cells as well as on tiles — so this counted the
+    Student ID column of the front office's recent-registrations table, where a
+    student awaiting approval has no number yet and correctly shows a dash, and
+    then failed the dashboard for not explaining a refusal that never happened.
+  */
+  const tiles = await page.locator('main [data-tile]').allTextContents()
   const dashes = tiles.filter((t) => t.trim() === '—').length
   const restrictedNotes = await page.locator('main :text("Not available to your role")').count()
   check(
