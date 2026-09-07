@@ -150,7 +150,15 @@ function KpiCard({ label, value, context, icon, href, spark }: Kpi) {
         </span>
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
+        {/*
+          `data-tile` marks this as a headline figure. `.tabular` cannot: it is
+          a typographic utility for lining numerals up, and it sits on chart
+          labels, record counts and table cells too — so a sweep for dashed
+          tiles was picking up student-ID cells that are legitimately blank and
+          calling the dashboard broken.
+        */}
         <span
+          data-tile="kpi"
           className={cx(
             'tabular text-[27px] leading-none',
             unavailable ? 'text-silver' : 'text-graphite',
@@ -491,6 +499,7 @@ export function StructureStrip({
           <>
             <dt className="text-[11px] text-stone">{item.label}</dt>
             <dd
+              data-tile="structure"
               className={cx(
                 'tabular mt-0.5 text-[19px] leading-none',
                 item.value === null ? 'text-silver' : 'text-graphite',
