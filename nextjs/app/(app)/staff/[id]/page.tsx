@@ -25,6 +25,7 @@ import { formatSelection, formatText, trimNumber } from '@/lib/format'
 import {
   getActivationBlockers,
   getStaff,
+  getStaffDocuments,
   getStaffLinks,
   getStaffPersonalData,
   getTeacherProfileFor,
@@ -43,16 +44,37 @@ export const metadata = { title: 'Staff record · Async School' }
 
 const Restricted = () => <span className="text-stone">Restricted to your role</span>
 
+/**
+ * The staff binaries, paired with the char field holding each one's name.
+ *
+ * Stated once here and matched by `lib/odoo/models/files.ts`, which is what
+ * decides whether the API will serve them at all. Adding a fourth means adding
+ * it in both places, and forgetting the second is a 404 rather than a leak.
+ */
+const STAFF_DOCUMENTS = [
+  { field: 'id_document', label: 'ID document', filenameField: 'id_document_filename' },
+  {
+    field: 'qualification_document',
+    label: 'Qualification',
+    filenameField: 'qualification_document_filename',
+  },
+  {
+    field: 'employment_contract',
+    label: 'Employment contract',
+    filenameField: 'employment_contract_filename',
+  },
+] as const
+
 export default async function StaffDetailPage({ params }: PageProps<'/staff/[id]'>) {
   const id = Number((await params).id)
   if (!Number.isFinite(id)) notFound()
 
   let staff, responsibilities, employment, dailyStatus, personal, links, blockers,
-    canWrite, teacherProfile, meta, campuses, managers
+    canWrite, teacherProfile, meta, campuses, managers, documents
   try {
     ;[
       staff, responsibilities, employment, dailyStatus, personal, links, blockers,
-      canWrite, teacherProfile, meta, campuses, managers,
+      canWrite, teacherProfile, meta, campuses, managers, documents,
     ] = await Promise.all([
       getStaff(id),
       listResponsibilities(id),
@@ -66,6 +88,7 @@ export default async function StaffDetailPage({ params }: PageProps<'/staff/[id]
       staffFieldMeta(),
       listCampusOptions(),
       listManagerOptions(id),
+      getStaffDocuments(id),
     ])
   } catch (cause) {
     return (
@@ -309,6 +332,50 @@ export default async function StaffDetailPage({ params }: PageProps<'/staff/[id]
               </DataTable>
             )}
           </TableCard>
+
+          {/*
+            The three binaries school.staff has always carried and the
+            application has never shown. They sit behind a registrar-only field
+            group, so they are read separately from the rest of the record and a
+            role without that group is told so rather than being handed an
+            error page.
+          */}
+          <Card>
+            <CardHeader
+              title="Staff documents"
+              icon="documents"
+              hint="Held by Odoo against this staff record."
+            />
+            {documents === null ? (
+              <RestrictedState what="Staff documents" />
+            ) : (
+              <div>
+                {STAFF_DOCUMENTS.map(({ field, label, filenameField }) => {
+                  const filename = documents[filenameField]
+                  return (
+                    <div
+                      key={field}
+                      className="flex flex-wrap items-baseline justify-between gap-2 border-t border-silver py-3 first:border-0 first:pt-0"
+                    >
+                      <span className="text-[13px] font-medium text-graphite">{label}</span>
+                      {filename ? (
+                        <a
+                          href={`/api/files/staff/${staff.id}/${field}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="min-w-0 break-all text-[12px] text-action-blue hover:underline"
+                        >
+                          {filename}
+                        </a>
+                      ) : (
+                        <span className="text-[12px] text-stone">Not attached</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </Card>
 
           <TableCard
             title="Recent daily status"

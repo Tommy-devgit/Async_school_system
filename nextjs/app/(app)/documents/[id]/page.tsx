@@ -39,6 +39,24 @@ export default async function DocumentDetailPage({ params }: PageProps<'/documen
       note="Rejecting requires a reason — Odoo refuses the transition without one. Document history cannot be deleted."
       fields={[
         { label: 'Type', value: m2oLabel(doc.document_type_id) },
+        {
+          label: 'File',
+          /*
+            The whole point of the record, and it was the one thing this screen
+            could not show. A verifier had to take the checksum on trust or open
+            Odoo's back office to see what they were approving.
+          */
+          value: (
+            <a
+              href={`/api/files/document/${doc.id}/file`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-action-blue hover:underline"
+            >
+              Open the document
+            </a>
+          ),
+        },
         { label: 'Student', value: m2oLabel(doc.student_id) },
         { label: 'Staff', value: m2oLabel(doc.staff_id) },
         { label: 'Expires', value: doc.expiry_date || '—' },
