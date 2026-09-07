@@ -507,3 +507,28 @@ export function dryRunStaffImport(base64Csv: string): Promise<StaffImportReport>
 export function runStaffImport(base64Csv: string): Promise<StaffImportReport> {
   return callKw<StaffImportReport>('school.staff.import', 'run_import_upload', [base64Csv])
 }
+
+/**
+ * The three documents a staff record can carry.
+ *
+ * Read on their own rather than with the rest of the record: all three carry a
+ * registrar-only field group, so folding them into STAFF_DETAIL_FIELDS would
+ * turn the whole staff page into an AccessError for every other role. Null here
+ * means "not yours to see", which the page reports as such — the same shape
+ * getStudentDocuments already uses.
+ */
+export function getStaffDocuments(
+  id: number,
+): Promise<{
+  id_document_filename: string | false
+  qualification_document_filename: string | false
+  employment_contract_filename: string | false
+} | null> {
+  return orNullOnRefusal(
+    readOne('school.staff', id, [
+      'id_document_filename',
+      'qualification_document_filename',
+      'employment_contract_filename',
+    ]),
+  )
+}

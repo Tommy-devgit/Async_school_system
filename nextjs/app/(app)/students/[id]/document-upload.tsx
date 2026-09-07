@@ -36,9 +36,26 @@ export function DocumentUpload({
     <div className="border-t border-silver py-3 first:border-0 first:pt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-[13px] font-medium text-graphite">{label}</span>
-        <span className="min-w-0 break-all text-[12px] text-slate">
-          {attached ? attached : <span className="text-stone">Not attached</span>}
-        </span>
+        {/*
+          The filename, and a way to actually open it. Printing the name alone
+          told a registrar the certificate existed and gave them nowhere to go:
+          the only way to see what had been uploaded was Odoo's own back office.
+
+          `target="_blank"` because the point is to look at it beside the record
+          being checked, not to navigate away from the student.
+        */}
+        {attached ? (
+          <a
+            href={`/api/files/student/${studentId}/${field}`}
+            target="_blank"
+            rel="noreferrer"
+            className="min-w-0 break-all text-[12px] text-action-blue hover:underline"
+          >
+            {attached}
+          </a>
+        ) : (
+          <span className="text-[12px] text-stone">Not attached</span>
+        )}
       </div>
       {hint ? <p className="mt-0.5 text-[11px] text-stone">{hint}</p> : null}
 
