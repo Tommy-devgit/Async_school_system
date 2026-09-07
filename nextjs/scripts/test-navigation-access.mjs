@@ -41,7 +41,7 @@ const EXPECTED = {
   admin: [
     '/dashboard', '/students', '/guardians', '/enrollments', '/staff', '/teachers',
     '/schedule', '/attendance', '/assignments', '/assessments', '/marks',
-    '/report-cards', '/promotion', '/documents', '/announcements', '/programs',
+    '/report-cards', '/rankings', '/promotion', '/documents', '/announcements', '/programs',
     '/classes', '/subjects', '/curriculum', '/academic-years', '/configuration',
     '/rooms', '/branches', '/configuration/grading',
   ],
@@ -49,26 +49,26 @@ const EXPECTED = {
   director: [
     '/dashboard', '/students', '/guardians', '/enrollments', '/staff', '/teachers',
     '/schedule', '/attendance', '/assignments', '/assessments', '/marks',
-    '/report-cards', '/announcements', '/programs', '/classes', '/curriculum',
+    '/report-cards', '/rankings', '/announcements', '/programs', '/classes', '/curriculum',
     '/branches',
   ],
   registrar: [
     '/dashboard', '/students', '/guardians', '/enrollments', '/staff', '/teachers',
     '/schedule', '/attendance', '/assignments', '/assessments', '/marks',
-    '/report-cards', '/promotion', '/documents', '/announcements', '/programs',
+    '/report-cards', '/rankings', '/promotion', '/documents', '/announcements', '/programs',
     '/classes', '/subjects', '/curriculum', '/academic-years', '/configuration',
     '/branches',
   ],
   teacher: [
     '/dashboard', '/students', '/guardians', '/enrollments', '/staff', '/teachers',
     '/schedule', '/attendance', '/assignments', '/assessments', '/marks',
-    '/promotion', '/announcements', '/programs', '/classes', '/subjects',
-    '/curriculum', '/academic-years', '/rooms', '/branches',
+    '/report-cards', '/rankings', '/promotion', '/announcements', '/programs',
+    '/classes', '/subjects', '/curriculum', '/academic-years', '/rooms', '/branches',
   ],
   frontoffice: ['/dashboard', '/students', '/guardians', '/staff', '/announcements', '/branches'],
   exam: [
     '/dashboard', '/students', '/enrollments', '/teachers', '/assignments',
-    '/assessments', '/marks', '/report-cards', '/classes', '/subjects',
+    '/assessments', '/marks', '/report-cards', '/rankings', '/classes', '/subjects',
     '/curriculum', '/academic-years', '/configuration/grading',
   ],
   hr: ['/dashboard', '/staff', '/documents', '/branches'],
@@ -99,6 +99,8 @@ const READABLE = {
   '/assessments': ['admin', 'director', 'registrar', 'teacher', 'exam'],
   '/marks': ['admin', 'director', 'registrar', 'teacher', 'exam'],
   '/report-cards': ['admin', 'director', 'registrar', 'teacher', 'exam'],
+  // Reads school.report.card, so it carries that model's ACL exactly.
+  '/rankings': ['admin', 'director', 'registrar', 'teacher', 'exam'],
   '/promotion': ['admin', 'registrar', 'teacher'],
   '/documents': ['admin', 'registrar', 'hr'],
   '/announcements': ['admin', 'director', 'registrar', 'teacher', 'frontoffice'],
@@ -126,14 +128,20 @@ for (const role of ROLES) {
 }
 
 /*
-  The one place the menu is deliberately narrower than the ACL.
+  Where the menu is deliberately narrower than the ACL. Empty, and that is the
+  assertion: every role is now offered everything it can read.
 
-  A teacher can read school.report.card, but that model carries no record rule,
-  so the rows are every report card in the school rather than their own
-  classes'. Hiding the link is not what makes that safe — only a record rule
-  would — so this asserts the omission is the known one and not a fresh gap.
+  It held teacher:/report-cards for a long time, because school.report.card
+  carried no record rule and a teacher reading it got every card in the school.
+  That was fixed rather than left standing — the model has four rules now, and
+  a teacher sees only the classes they teach — so the entry was removed and the
+  route offered instead. /rankings, which reads the same model, went with it.
+
+  An entry here is a promise to come back to it, not a place to park a route
+  somebody could not be bothered to authorise. Anything added should say which
+  refusal it is avoiding and what would let it be removed.
 */
-const KNOWN_NARROWER = new Set(['teacher:/report-cards'])
+const KNOWN_NARROWER = new Set([])
 for (const [href, roles] of Object.entries(READABLE)) {
   for (const role of roles) {
     const key = `${role}:${href}`
