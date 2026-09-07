@@ -133,7 +133,7 @@ class ResCompany(models.Model):
         string='School Timezone',
     )
     school_subject_attendance = fields.Boolean(string='Enable Subject Attendance')
-    school_ranking = fields.Boolean(string='Enable Student Ranking')
+    school_ranking = fields.Boolean(string='Enable Student Ranking', default=True)
     school_approval_required = fields.Boolean(default=True)
     school_capacity_override = fields.Boolean(string='Allow Capacity Overrides')
     school_grading_configured = fields.Boolean(string='Grading Policy Configured')
