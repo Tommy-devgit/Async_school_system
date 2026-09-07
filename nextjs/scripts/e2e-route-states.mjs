@@ -104,8 +104,15 @@ collecting = true
 */
 await page.goto(`${BASE}/students?page=99999`, { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
-check('a page past the end lands on a real one',
-  !new URL(page.url()).searchParams.get('page'), page.url())
+/*
+  The landing page is the last real one, which is only page 1 when the list
+  fits on a single page. This asserted the `page` parameter was gone, so it
+  passed on a small database and failed the moment there were twenty-six
+  students — reporting the redirect as broken while it was working exactly as
+  intended. What matters is that the reader ends up somewhere with rows on it.
+*/
+const landedOn = Number(new URL(page.url()).searchParams.get('page') ?? '1')
+check('a page past the end lands on a real one', landedOn < 99999, page.url())
 check('and shows rows once it gets there', (await page.locator('main tbody tr').count()) > 0)
 
 await page.goto(`${BASE}/students`, { waitUntil: 'networkidle' })
