@@ -1,6 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { schoolTimeZone } from '@/lib/odoo/school-timezone'
+import { toUtc } from '@/lib/school-time'
 import { redirect } from 'next/navigation'
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
@@ -27,9 +29,14 @@ const RECORD_AUDIENCES = new Set<string>([
 ])
 
 /** `2026-09-11` plus `14:30` in Odoo's stored shape. Blank stays blank. */
-function joinDateTime(date: string, time: string): string {
+async function joinDateTime(date: string, time: string): Promise<string> {
+  /*
+    Converted, not concatenated. Odoo stores a Datetime in UTC, and sending the
+    wall clock verbatim stored a time three hours from the one that was typed —
+    which nothing revealed, because reading it back skipped the conversion too.
+  */
   if (!date) return ''
-  return `${date} ${time || '00:00'}:00`
+  return toUtc(date, time, await schoolTimeZone())
 }
 
 /**
@@ -54,8 +61,8 @@ export async function createAnnouncementAction(
   const audienceType = text('audience_type') as AudienceType
   const link = text('link')
 
-  const publishDatetime = joinDateTime(text('publish_date'), text('publish_time'))
-  const expiryDatetime = joinDateTime(text('expiry_date'), text('expiry_time'))
+  const publishDatetime = await joinDateTime(text('publish_date'), text('publish_time'))
+  const expiryDatetime = await joinDateTime(text('expiry_date'), text('expiry_time'))
 
   const values = {
     name,
@@ -138,8 +145,8 @@ export async function updateAnnouncementAction(
   const category = text('category')
   const priority = text('priority') || '0'
   const link = text('link')
-  const publishDatetime = joinDateTime(text('publish_date'), text('publish_time'))
-  const expiryDatetime = joinDateTime(text('expiry_date'), text('expiry_time'))
+  const publishDatetime = await joinDateTime(text('publish_date'), text('publish_time'))
+  const expiryDatetime = await joinDateTime(text('expiry_date'), text('expiry_time'))
 
   const values = {
     name,

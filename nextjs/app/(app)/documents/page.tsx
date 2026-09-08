@@ -54,8 +54,19 @@ export default async function DocumentsPage({ searchParams }: PageProps<'/docume
         })
       }
       rowHref={(row) => `/documents/${row.id}`}
-      emptyTitle="No documents visible"
-      emptyHint="Document access is restricted to the registrar and HR."
+      /*
+        An empty register is the normal first state of this screen, not a
+        permission problem. The previous wording said access was restricted to
+        the registrar and HR, which a registrar reading it — the only person
+        likely to be here — could only take as "you are not allowed", when the
+        real answer is that nobody has filed anything yet.
+
+        It also says where the registration documents are, because they are not
+        here: a birth certificate uploaded on a student's page is a field on
+        that student, and never becomes a school.document.
+      */
+      emptyTitle="Nothing filed yet"
+      emptyHint="This is the filing cabinet for typed documents — with an owner, an expiry date and a verification step. A student's birth certificate lives on their own record, not here."
       columns={[
         {
           key: 'name',

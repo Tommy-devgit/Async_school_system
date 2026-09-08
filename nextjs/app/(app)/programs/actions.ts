@@ -1,6 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { schoolTimeZone } from '@/lib/odoo/school-timezone'
+import { toUtc } from '@/lib/school-time'
 import { redirect } from 'next/navigation'
 import { requireSession } from '@/lib/odoo/auth'
 import { toOdooError } from '@/lib/odoo/errors'
@@ -75,15 +77,20 @@ const text = (form: FormData, key: string) => String(form.get(key) ?? '').trim()
  * unreadable on a phone, and because the time is far more often left at a
  * round hour than the date is left at today.
  */
-function joinDateTime(date: string, time: string): string {
+async function joinDateTime(date: string, time: string): Promise<string> {
+  /*
+    Converted, not concatenated. Odoo stores a Datetime in UTC, and sending the
+    wall clock verbatim stored a time three hours from the one that was typed —
+    which nothing revealed, because reading it back skipped the conversion too.
+  */
   if (!date) return ''
-  return `${date} ${time || '00:00'}:00`
+  return toUtc(date, time, await schoolTimeZone())
 }
 
-function collect(form: FormData): {
+async function collect(form: FormData): Promise<{
   intake?: ProgramIntake
   fieldErrors?: Record<string, string>
-} {
+}> {
   const fieldErrors: Record<string, string> = {}
 
   const name = text(form, 'name')
@@ -114,8 +121,8 @@ function collect(form: FormData): {
   if (!startDate) fieldErrors.start_date = 'Give the program a start date.'
   if (!endDate) fieldErrors.end_date = 'Give the program an end date.'
 
-  const start = joinDateTime(startDate, text(form, 'start_time'))
-  const end = joinDateTime(endDate, text(form, 'end_time'))
+  const start = await joinDateTime(startDate, text(form, 'start_time'))
+  const end = await joinDateTime(endDate, text(form, 'end_time'))
   if (start && end && end <= start) {
     // Mirrors CHECK(end_datetime > start_datetime); Odoo enforces it either way.
     fieldErrors.end_date = 'The program must end after it starts.'
@@ -146,7 +153,7 @@ export async function createProgramAction(
 ): Promise<ProgramFormState> {
   await requireSession()
 
-  const { intake, fieldErrors } = collect(form)
+  const { intake, fieldErrors } = await collect(form)
   if (fieldErrors) return { fieldErrors, ...echo(form) }
 
   let id: number
@@ -170,7 +177,7 @@ export async function updateProgramAction(
   const id = Number(text(form, 'id'))
   if (!Number.isInteger(id) || id <= 0) return { error: 'That program could not be identified.' }
 
-  const { intake, fieldErrors } = collect(form)
+  const { intake, fieldErrors } = await collect(form)
   if (fieldErrors) return { fieldErrors, ...echo(form) }
 
   try {
