@@ -25,7 +25,18 @@ async function total(page) {
   return match ? Number(match[1].replace(/,/g, '')) : null
 }
 
-const rowCount = (page) => page.locator('main tbody tr').count()
+/*
+  Data rows only.
+
+  A grouped list — the student roll, by grade — puts a heading in the table
+  body as a row of its own, so `tbody tr` counts three headings among
+  twenty-five students and every count drawn from it is wrong. The heading is
+  the row carrying a `th[scope="colgroup"]`, and excluding it is what keeps
+  these checks counting students.
+*/
+const DATA_ROW = 'main tbody tr:not(:has(th[scope="colgroup"]))'
+
+const rowCount = (page) => page.locator(DATA_ROW).count()
 
 /*
   The first cell that carries data — one per row.
@@ -36,8 +47,8 @@ const rowCount = (page) => page.locator('main tbody tr').count()
   column on both, and keeps one cell per row rather than all of them.
 */
 async function firstDataCell(page) {
-  const selectable = (await page.locator('main tbody tr td input[name="id"]').count()) > 0
-  return page.locator(`main tbody tr td:nth-child(${selectable ? 2 : 1})`)
+  const selectable = (await page.locator(`${DATA_ROW} td input[name="id"]`).count()) > 0
+  return page.locator(`${DATA_ROW} td:nth-child(${selectable ? 2 : 1})`)
 }
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
@@ -225,7 +236,7 @@ for (const url of LINKED_LISTS) {
   }
   await page.locator('main').first().waitFor({ timeout: 30_000 })
 
-  const rows = await page.locator('main tbody tr').count()
+  const rows = await rowCount(page)
   if (rows === 0) {
     console.log(`    ${url.padEnd(18)} no rows visible to this role — nothing to check`)
     continue

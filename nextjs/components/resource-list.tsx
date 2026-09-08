@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { FilterSelect, SearchField, type FilterSpec } from '@/components/list-toolbar'
 import {
   Card,
@@ -8,6 +8,7 @@ import {
   DataTable,
   EmptyState,
   ErrorState,
+  GroupHeader,
   PageHeader,
   Pagination,
   Row,
@@ -18,6 +19,7 @@ import {
 } from '@/components/ui'
 import type { IconName } from '@/components/icons'
 import { pluralise } from '@/lib/format'
+import { groupRows } from '@/lib/group-rows'
 import { listHrefs, parseListQuery, type ListQuery, type RawSearchParams } from '@/lib/list-query'
 import { toOdooError } from '@/lib/odoo/errors'
 import { hasAccess } from '@/lib/odoo/client'
@@ -66,6 +68,7 @@ export async function ResourceList<T extends { id: number }>({
   caption,
   removable,
   rowLabel,
+  groupBy,
 }: {
   title: string
   /** Overrides the default "n records visible to you". */
@@ -96,6 +99,25 @@ export async function ResourceList<T extends { id: number }>({
   removable?: RemovalKey
   /** What to call a row in the confirmation — defaults to the record's name. */
   rowLabel?: (row: T) => string
+  /**
+   * Splits the page into labelled groups — a grade, say — with a heading row
+   * before each. Opt-in: a list that does not pass it renders as before.
+   *
+   * `sortField` is what makes this honest. Grouping only means anything while
+   * the rows are ordered by the thing being grouped on, so the headings appear
+   * only when the list is actually sorted that way; sort by name instead and
+   * the grades interleave, which is what sorting by name means, and the
+   * headings step aside rather than drawing a boundary every second row.
+   *
+   * Grouping never re-orders. Sorting here would sort the rows this page
+   * happens to hold rather than the result set, which is why nothing else in
+   * this list sorts in the browser either.
+   */
+  groupBy?: {
+    /** Group only while the list is sorted by this field. */
+    sortField: string
+    of: (row: T) => { key: string; label: string } | null
+  }
 }) {
   const params = await searchParams
   const query = parseListQuery(params, {
@@ -169,9 +191,7 @@ export async function ResourceList<T extends { id: number }>({
     ) : undefined,
   }))
 
-  const rowsTable = (
-        <DataTable columns={[...selectColumn, ...tableColumns]} caption={caption ?? title}>
-          {result.rows.map((row) => (
+  const renderRow = (row: T) => (
             <Row key={row.id} href={rowHref?.(row)}>
               {canRemove ? (
                 <Cell>
@@ -207,7 +227,24 @@ export async function ResourceList<T extends { id: number }>({
                 </Cell>
               ))}
             </Row>
-          ))}
+  )
+
+  const columnCount = selectColumn.length + tableColumns.length
+  const groups =
+    groupBy && query.sortField === groupBy.sortField
+      ? groupRows(result.rows, groupBy.of)
+      : null
+
+  const rowsTable = (
+        <DataTable columns={[...selectColumn, ...tableColumns]} caption={caption ?? title}>
+          {groups
+            ? groups.map((group) => (
+                <Fragment key={group.key}>
+                  <GroupHeader label={group.label} span={columnCount} count={group.rows.length} />
+                  {group.rows.map(renderRow)}
+                </Fragment>
+              ))
+            : result.rows.map(renderRow)}
         </DataTable>
   )
 

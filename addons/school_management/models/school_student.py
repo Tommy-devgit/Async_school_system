@@ -72,6 +72,22 @@ class SchoolStudent(models.Model):
     class_grade_level = fields.Selection(
         related='class_id.grade_id.level', string='Grade Level', readonly=True,
     )
+    # Stored so the list can be ordered by grade. `class_grade_level` above is
+    # related but unstored, which is enough to display and useless to sort on:
+    # the ORM refuses `order='class_id.grade_id'`, and ordering by `class_id`
+    # sorts on the class name, putting Grade 10 between Grade 1 and Grade 2.
+    #
+    # Ordering by this instead follows school.grade._order — `sequence, name`,
+    # where the sequence runs 10, 20 … 120 — so the grades come back in
+    # numeric order without anything parsing the label.
+    #
+    # The same denormalisation school.report.card already makes, for the same
+    # reason. It carries no rule of its own: the value is whatever the class
+    # says, and it moves when a student changes class.
+    grade_id = fields.Many2one(
+        'school.grade', related='class_id.grade_id',
+        string='Grade', store=True, index=True, readonly=True,
+    )
     academic_year_id = fields.Many2one(
             'school.academic.year',
             string="Academic Year",
