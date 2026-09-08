@@ -128,15 +128,48 @@ try {
   check('the audience persisted', created.audience_type === 'department', String(created.audience_type))
   check('the department persisted', created.department === department, String(created.department))
   check('the location persisted', created.location === 'Main hall', String(created.location))
+  /*
+    Odoo stores a Datetime in UTC, so the stored string is NOT the one that was
+    typed — 09:00 in a school running on Africa/Addis_Ababa is 06:00 UTC. This
+    used to assert the two were equal, which passed only because the
+    application skipped the conversion in both directions and was three hours
+    wrong in the database the whole time.
+
+    Read back through Intl rather than through the application's own helper: a
+    conversion checked with itself proves nothing, and this has to fail if the
+    helper is wrong. What it asserts is the property that matters — the instant
+    Odoo stored, seen from the school's own clock, is the one that was typed.
+  */
+  const [company] = await odoo(sid, 'res.company', 'search_read', [[], ['school_timezone']])
+  const zone = company?.school_timezone || 'Africa/Addis_Ababa'
+  const asSchoolTime = (stored) =>
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: zone,
+      hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    })
+      .formatToParts(new Date(String(stored).replace(' ', 'T') + 'Z'))
+      .reduce((out, part) => ({ ...out, [part.type]: part.value }), {})
+
+  const startBack = asSchoolTime(created.start_datetime)
+  const endBack = asSchoolTime(created.end_datetime)
   check(
-    'the start datetime persisted',
-    String(created.start_datetime).startsWith('2026-05-04 09:00'),
-    String(created.start_datetime),
+    'the start datetime persisted as the instant that was typed',
+    `${startBack.year}-${startBack.month}-${startBack.day} ${startBack.hour}:${startBack.minute}` ===
+      '2026-05-04 09:00',
+    `stored ${created.start_datetime} UTC = ${startBack.hour}:${startBack.minute} in ${zone}`,
   )
   check(
-    'the end datetime persisted',
-    String(created.end_datetime).startsWith('2026-05-04 16:30'),
-    String(created.end_datetime),
+    'the end datetime persisted as the instant that was typed',
+    `${endBack.year}-${endBack.month}-${endBack.day} ${endBack.hour}:${endBack.minute}` ===
+      '2026-05-04 16:30',
+    `stored ${created.end_datetime} UTC = ${endBack.hour}:${endBack.minute} in ${zone}`,
+  )
+  check(
+    'and it is genuinely stored in UTC, not as the wall clock',
+    zone === 'UTC' || !String(created.start_datetime).startsWith('2026-05-04 09:00'),
+    String(created.start_datetime),
   )
   // Publishing is a transition; creating must never skip it.
   check('it was created in draft', created.state === 'draft', String(created.state))

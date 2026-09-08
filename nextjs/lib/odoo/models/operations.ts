@@ -1,6 +1,8 @@
 import 'server-only'
 import { callKw, create, hasAccess, readOne, searchRead, write } from '@/lib/odoo/client'
 import { orNullOnRefusal } from '@/lib/odoo/errors'
+import { schoolTimeZone } from '@/lib/odoo/school-timezone'
+import { localiseFields } from '@/lib/school-time'
 import { listDomain, type ListOptions } from '@/lib/odoo/list'
 import type { Many2one, Page, Selection } from '@/lib/odoo/types'
 
@@ -370,8 +372,13 @@ export const ANNOUNCEMENT_FILTERS = {
   priority: { field: 'priority' },
 } as const
 
-export function listAnnouncements(options: ListOptions = {}): Promise<Page<AnnouncementRow>> {
-  return searchRead<AnnouncementRow>('school.announcement', ANNOUNCEMENT_FIELDS, {
+/** Same conversion as PROGRAM_TIMES, and the same reason. */
+const ANNOUNCEMENT_TIMES = ['publish_datetime', 'expiry_datetime'] as const
+
+export async function listAnnouncements(options: ListOptions = {}): Promise<Page<AnnouncementRow>> {
+  const [zone, page] = await Promise.all([
+    schoolTimeZone(),
+    searchRead<AnnouncementRow>('school.announcement', ANNOUNCEMENT_FIELDS, {
     domain: listDomain(options, {
       searchFields: ['name'],
       filters: ANNOUNCEMENT_FILTERS,
@@ -379,7 +386,9 @@ export function listAnnouncements(options: ListOptions = {}): Promise<Page<Annou
     limit: options.limit ?? 25,
     offset: options.offset ?? 0,
     order: options.order ?? 'publish_datetime desc',
-  })
+    }),
+  ])
+  return { ...page, rows: page.rows.map((row) => localiseFields(row, ANNOUNCEMENT_TIMES, zone)) }
 }
 
 /** Live announcements for a dashboard panel. `is_live` has a search method. */
@@ -393,10 +402,16 @@ export function listLiveAnnouncements(limit = 4): Promise<Page<AnnouncementRow> 
   )
 }
 
-export function getAnnouncement(
+export async function getAnnouncement(
   id: number,
 ): Promise<(AnnouncementRow & { message: string | false; link: string | false }) | null> {
-  return readOne('school.announcement', id, [...ANNOUNCEMENT_FIELDS, 'message', 'link'])
+  const [zone, row] = await Promise.all([
+    schoolTimeZone(),
+    readOne<AnnouncementRow & { message: string | false; link: string | false }>(
+      'school.announcement', id, [...ANNOUNCEMENT_FIELDS, 'message', 'link'],
+    ),
+  ])
+  return row && localiseFields(row, ANNOUNCEMENT_TIMES, zone)
 }
 
 /**
@@ -623,17 +638,34 @@ export const PROGRAM_FILTERS = {
   audience: { field: 'audience_type' },
 } as const
 
-export function listPrograms(options: ListOptions = {}): Promise<Page<ProgramRow>> {
-  return searchRead<ProgramRow>('school.program', PROGRAM_FIELDS, {
+/*
+  Odoo stores these in UTC and this application had never converted either way,
+  so a program entered for 14:00 was stored as 14:00 UTC — three hours out, and
+  invisible because the same omission on the way back made the screen agree
+  with itself. Converting here keeps every caller above the services working in
+  one kind of time: school time in, school time out.
+*/
+const PROGRAM_TIMES = ['start_datetime', 'end_datetime'] as const
+
+export async function listPrograms(options: ListOptions = {}): Promise<Page<ProgramRow>> {
+  const [zone, page] = await Promise.all([
+    schoolTimeZone(),
+    searchRead<ProgramRow>('school.program', PROGRAM_FIELDS, {
     domain: listDomain(options, { searchFields: ['name', 'location'], filters: PROGRAM_FILTERS }),
     limit: options.limit ?? 25,
     offset: options.offset ?? 0,
     order: options.order ?? 'start_datetime desc',
-  })
+    }),
+  ])
+  return { ...page, rows: page.rows.map((row) => localiseFields(row, PROGRAM_TIMES, zone)) }
 }
 
-export function getProgram(id: number): Promise<ProgramRow | null> {
-  return readOne<ProgramRow>('school.program', id, PROGRAM_FIELDS)
+export async function getProgram(id: number): Promise<ProgramRow | null> {
+  const [zone, row] = await Promise.all([
+    schoolTimeZone(),
+    readOne<ProgramRow>('school.program', id, PROGRAM_FIELDS),
+  ])
+  return row && localiseFields(row, PROGRAM_TIMES, zone)
 }
 
 /** The audience fields, read back so an edit form can open on what is set. */
@@ -662,10 +694,12 @@ const PROGRAM_DETAIL_FIELDS = [
   'active',
 ] as const
 
-export function getProgramDetail(id: number): Promise<ProgramDetail | null> {
-  return orNullOnRefusal(
-    readOne<ProgramDetail>('school.program', id, PROGRAM_DETAIL_FIELDS),
-  )
+export async function getProgramDetail(id: number): Promise<ProgramDetail | null> {
+  const [zone, row] = await Promise.all([
+    schoolTimeZone(),
+    orNullOnRefusal(readOne<ProgramDetail>('school.program', id, PROGRAM_DETAIL_FIELDS)),
+  ])
+  return row && localiseFields(row, PROGRAM_TIMES, zone)
 }
 
 export interface ProgramIntake {
