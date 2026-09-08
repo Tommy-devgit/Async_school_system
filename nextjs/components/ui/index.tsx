@@ -33,6 +33,7 @@ export type { Column } from './table'
 export {
   Cell,
   DataTable,
+  GroupHeader,
   Pagination,
   Row,
   RowLink,

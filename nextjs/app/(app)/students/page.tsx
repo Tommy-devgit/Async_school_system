@@ -6,7 +6,7 @@ import { listStudents } from '@/lib/odoo/models/school'
 import { selectionOptions } from '@/lib/odoo/selections'
 import { toOdooOrder } from '@/lib/list-query'
 import { formatText } from '@/lib/format'
-import { m2oLabel } from '@/lib/odoo/types'
+import { m2oId, m2oLabel } from '@/lib/odoo/types'
 
 export const metadata = { title: 'Students · Async School' }
 
@@ -35,16 +35,39 @@ export default async function StudentsPage({ searchParams }: PageProps<'/student
         { key: 'lifecycle', label: 'Lifecycle', options: lifecycleStatuses },
         { key: 'class', label: 'Class', options: classes },
       ]}
-      defaultSort={{ field: 'name', direction: 'asc' }}
-      load={(query) =>
-        listStudents({
+      /*
+        Grade first, because that is how a school reads its own roll. Ordering
+        on `grade_id` follows school.grade's `sequence, name` — 10, 20 … 120 —
+        so Grade 10 comes after Grade 9 instead of between Grade 1 and Grade 2,
+        which is what ordering on the class name did.
+      */
+      defaultSort={{ field: 'grade_id', direction: 'asc' }}
+      load={(query) => {
+        /*
+          The name is the tiebreaker inside whatever the reader chose, so a
+          grade's students are alphabetical. Skipped when they are already
+          sorting by name, which would otherwise ask Odoo to order by it twice.
+        */
+        const order = toOdooOrder(query)
+        return listStudents({
           search: query.search,
           filters: query.filters,
-          order: toOdooOrder(query),
+          order: order && !order.startsWith('name') ? `${order}, name asc` : order,
           limit: query.limit,
           offset: query.offset,
         })
-      }
+      }}
+      /*
+        Grouped only while the list is sorted by grade — see ResourceList. The
+        label is Odoo's own grade name, never a number parsed out of anything.
+      */
+      groupBy={{
+        sortField: 'grade_id',
+        of: (row) =>
+          m2oId(row.grade_id) === null
+            ? null
+            : { key: String(m2oId(row.grade_id)), label: m2oLabel(row.grade_id) },
+      }}
       action={
         canCreate ? (
           <LinkButton href="/students/new" variant="primary" icon="plus">
@@ -76,6 +99,20 @@ export default async function StudentsPage({ searchParams }: PageProps<'/student
           sortField: 'regno',
           render: (row) => <span className="tabular">{formatText(row.regno)}</span>,
         },
+        /*
+          Kept as a column even though the group heading repeats it, because it
+          is what makes grade a sort the reader can choose: sorting by name
+          scatters the grades and drops the headings, and this is the way back.
+          Hidden on the narrowest screens, where the heading already carries it.
+        */
+        {
+          key: 'grade',
+          label: 'Grade',
+          sortField: 'grade_id',
+          hideBelow: 'sm',
+          render: (row) => m2oLabel(row.grade_id),
+        },
+        /* The class carries the section, so it stays beside the grade. */
         { key: 'class', label: 'Class', render: (row) => m2oLabel(row.class_id) },
         {
           key: 'year',

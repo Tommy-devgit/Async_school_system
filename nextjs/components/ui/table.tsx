@@ -75,6 +75,52 @@ export function DataTable({
 }
 
 /**
+ * A heading that splits the rows below it into a named group.
+ *
+ * A row in the table rather than a separate card per group: the columns stay
+ * aligned down the whole list, one horizontal scroll still covers everything on
+ * a narrow screen, and the sticky-free markup keeps working when a group runs
+ * across a page boundary. Splitting into one table per group would align each
+ * group's columns independently and make the list harder to scan, which is the
+ * opposite of the point.
+ *
+ * `scope="colgroup"` so a screen reader announces the grade before reading the
+ * students under it, and the styling is the table's own column-heading
+ * treatment one step darker, so it reads as structure rather than as data.
+ */
+export function GroupHeader({
+  label,
+  span,
+  count,
+}: {
+  label: string
+  /** How many columns the table has, so the heading spans all of them. */
+  span: number
+  /** Shown beside the label — how many rows are in this group on this page. */
+  count?: number
+}) {
+  return (
+    <tr className="bg-paper">
+      <th
+        scope="colgroup"
+        colSpan={span}
+        className={cx(
+          'border-y border-silver px-4 py-2 text-left text-[11px] font-semibold',
+          'tracking-wide whitespace-nowrap text-graphite uppercase',
+        )}
+      >
+        {label}
+        {count === undefined ? null : (
+          <span className="ml-2 font-normal text-stone normal-case">
+            {count} {count === 1 ? 'student' : 'students'}
+          </span>
+        )}
+      </th>
+    </tr>
+  )
+}
+
+/**
  * A sortable column heading.
  *
  * Sorting is a link, not a click handler: it writes the field into the URL and

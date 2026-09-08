@@ -26,6 +26,7 @@ export interface StudentRow {
   name: string
   regno: string | false
   class_id: Many2one
+  grade_id: Many2one
   academic_year_id: Many2one
   registration_status: Selection
   lifecycle_status: Selection
@@ -36,6 +37,7 @@ const STUDENT_LIST_FIELDS = [
   'name',
   'regno',
   'class_id',
+  'grade_id',
   'academic_year_id',
   'registration_status',
   'lifecycle_status',
@@ -50,6 +52,22 @@ export const STUDENT_FILTERS = {
   year: { field: 'academic_year_id', kind: 'many2one' },
 } as const
 
+/**
+ * The default order, and the reason the screen can group by grade at all.
+ *
+ * A school's students are read by grade, so the list leads with it and falls
+ * back to the name inside each one. Ordering on `grade_id` follows
+ * school.grade's own `sequence, name` — 10, 20 … 120 — so Grade 10 lands after
+ * Grade 9 rather than between Grade 1 and Grade 2, which is what ordering on
+ * the class name did.
+ *
+ * A reader who sorts by a column still gets exactly what they asked for: this
+ * is only the default, and `toOdooOrder` replaces it. Grouping follows the
+ * order rather than imposing one, so a name-sorted list simply shows the
+ * grades interleaved, which is what sorting by name means.
+ */
+export const STUDENT_DEFAULT_ORDER = 'grade_id asc, name asc'
+
 export function listStudents(options: ListOptions = {}): Promise<Page<StudentRow>> {
   return searchRead<StudentRow>('school.student', STUDENT_LIST_FIELDS, {
     domain: listDomain(options, {
@@ -58,7 +76,7 @@ export function listStudents(options: ListOptions = {}): Promise<Page<StudentRow
     }),
     limit: options.limit ?? 25,
     offset: options.offset ?? 0,
-    order: options.order ?? 'name asc',
+    order: options.order ?? STUDENT_DEFAULT_ORDER,
   })
 }
 
